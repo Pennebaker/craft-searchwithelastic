@@ -28,7 +28,6 @@ use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\helpers\ArrayHelper;
-use craft\helpers\ElementHelper;
 use craft\i18n\Locale;
 use craft\models\Section;
 use craft\queue\Queue;
@@ -95,7 +94,7 @@ class SearchWithElastic extends Plugin
      * @since 4.0.0
      */
     public const EVENT_ERROR_NO_ATTACHMENT_PROCESSOR = 'errorNoAttachmentProcessor';
-    
+
     /**
      * @since 4.0.0
      */
@@ -278,7 +277,7 @@ class SearchWithElastic extends Plugin
                 $event->rules['search-with-elastic/get-all-elements'] = 'search-with-elastic/site/get-all-elements';
                 $event->rules['search-with-elastic/reindex-all'] = 'search-with-elastic/site/reindex-all';
                 $event->rules['search-with-elastic/reindex-element'] = 'search-with-elastic/site/reindex-element';
-                
+
                 // Public search endpoints with rate limiting
                 $event->rules['search-with-elastic/search'] = 'search-with-elastic/search/search';
                 $event->rules['search-with-elastic/search-extra'] = 'search-with-elastic/search/search-extra';
@@ -421,7 +420,7 @@ class SearchWithElastic extends Plugin
         if (!isset($definition['nodes'])) {
             // If no nodes are defined, create a default configuration based on elasticsearchEndpoint
             $endpoint = $settings->elasticsearchEndpoint ?? 'elasticsearch:9200';
-            
+
             // Check if endpoint already has a protocol
             if (preg_match('#^https?://#i', $endpoint)) {
                 $protocol = parse_url($endpoint, PHP_URL_SCHEME);
@@ -431,7 +430,7 @@ class SearchWithElastic extends Plugin
                 $protocol = 'http';
                 $endpointUrlWithoutProtocol = $endpoint;
             }
-            
+
             $definition['nodes'] = [
                 [
                     'protocol'     => $protocol,
@@ -445,9 +444,9 @@ class SearchWithElastic extends Plugin
                 'Elasticsearch configuration contains invalid nodes definition. Using default configuration.',
                 __METHOD__
             );
-            
+
             $endpoint = $settings->elasticsearchEndpoint ?? 'elasticsearch:9200';
-            
+
             // Check if endpoint already has a protocol
             if (preg_match('#^https?://#i', $endpoint)) {
                 $protocol = parse_url($endpoint, PHP_URL_SCHEME);
@@ -457,7 +456,7 @@ class SearchWithElastic extends Plugin
                 $protocol = 'http';
                 $endpointUrlWithoutProtocol = $endpoint;
             }
-            
+
             $definition['nodes'] = [
                 [
                     'protocol'     => $protocol,
