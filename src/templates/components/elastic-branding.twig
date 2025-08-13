@@ -1,0 +1,34 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Search w/Elastic plugin for Craft CMS 4.x
+ *
+ * Provides high-performance search across all content types with real-time
+ * indexing, advanced querying, and production reliability.
+ *
+ * @link https://www.pennebaker.com
+ * @copyright Copyright (c) 2025 Pennebaker
+ */
+#}
+
+{#
+/**
+ * Elastic Branding Component
+ *
+ * Displays the Elasticsearch logo and trademark notice as required for
+ * compliance with Elastic's trademark guidelines. Used throughout the
+ * control panel interface to maintain proper attribution.
+ */
+#}
+<div style="display: flex; align-items: center; gap: 0.5rem;">
+    <a href="https://www.elastic.co" target="_blank">
+        <img
+            src="{{ view.assetManager.getPublishedUrl('@pennebaker/searchwithelastic/resources/cp/img/elastic-logo.png') }}"
+            alt="Elastic logo"
+            />
+    </a>
+    <span style="color: var(--dark-sel-color);">
+        Elasticsearch is a trademark of Elasticsearch BV,
+        registered in the U.S. and in other countries.
+    </span>
+</div>

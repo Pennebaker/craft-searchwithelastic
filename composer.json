@@ -1,0 +1,55 @@
+{
+    "name": "pennebaker/craft-searchwithelastic",
+    "description": "Provides comprehensive search across all content types with real-time indexing, advanced querying, and production-level reliability.",
+    "type": "craft-plugin",
+    "keywords": [
+        "craft",
+        "cms",
+        "craftcms",
+        "craft-plugin",
+        "elasticsearch",
+        "search"
+    ],
+    "support": {
+        "docs": "https://github.com/pennebaker/craft-searchwithelastic",
+        "issues": "https://github.com/pennebaker/craft-searchwithelastic/issues?state=open",
+        "source": "https://github.com/pennebaker/craft-searchwithelastic"
+    },
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Pennebaker",
+            "homepage": "https://www.pennebaker.com"
+        }
+    ],
+    "require": {
+        "ext-dom": "*",
+        "craftcms/cms": "^4.0.0",
+        "yiisoft/yii2-elasticsearch": "^2.1.0"
+    },
+    "require-dev": {
+        "craftcms/commerce": "^4.0",
+        "craftcms/digital-products": "^3.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "craftcms/plugin-installer": true,
+            "yiisoft/yii2-composer": true
+        },
+        "optimize-autoloader": true,
+        "platform-check": false,
+        "sort-packages": true
+    },
+    "autoload": {
+        "psr-4": {
+            "pennebaker\\searchwithelastic\\": "src/"
+        }
+    },
+    "extra": {
+        "name": "Search with Elastic",
+        "handle": "search-with-elastic",
+        "schemaVersion": "4.0.0",
+        "changelogUrl": "https://raw.githubusercontent.com/pennebaker/craft-searchwithelastic/master/CHANGELOG.md",
+        "class": "pennebaker\\searchwithelastic\\SearchWithElastic"
+    }
+}

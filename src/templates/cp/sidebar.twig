@@ -1,0 +1,320 @@
+{#
+/**
+ * Search w/Elastic plugin for Craft CMS 4.x
+ *
+ * Provides high-performance search across all content types with real-time
+ * indexing, advanced querying, and production reliability.
+ *
+ * @link https://www.pennebaker.com
+ * @copyright Copyright (c) 2025 Pennebaker
+ */
+#}
+
+{#
+/**
+ * Element Edit Sidebar Integration
+ *
+ * Displays Search w/Elastic indexing status and controls within the
+ * element edit sidebar. Shows current index status, last update time,
+ * revision information, and provides a re-index button for authorized users.
+ *
+ * @var Element element - The element being edited
+ * @var User currentUser - Current user for permission checking
+ * @var string status - Index status (indexed, partial, outdated, not_indexed)
+ * @var string|null dateUpdated - Last Craft update timestamp
+ * @var int|null revisionNum - Element revision number
+ * @var bool disabledType - Whether this element type is disabled for indexing
+ */
+#}
+<div class="meta" style="padding-top: 14px;">
+    <h4 class="heading">Elasticsearch</h4>
+    <div id="elasticsearch-status-field" class="field">
+        <div class="heading">
+            <label>Status</label>
+        </div>
+        <div class="input ltr" id="elasticsearch-status-content">
+            {% if disabledType %}
+                <span class="status disabled"></span> {{ "Disabled Type"|t('search-with-elastic') }}
+            {% else %}
+                {% if status == 'indexed' %}
+                    <span class="status enabled"></span> {{ "Indexed"|t('search-with-elastic') }}
+                {% elseif status == 'partial' %}
+                    <span class="status pending"></span> {{ "Partial Index"|t('search-with-elastic') }}
+                {% elseif status == 'outdated' %}
+                    <span class="status expired"></span> {{ "Outdated"|t('search-with-elastic') }}
+                {% elseif status == 'not_indexed' %}
+                    <span class="status off"></span> {{ "Not Indexed"|t('search-with-elastic') }}
+                {% else %}
+                    {# Legacy support for boolean status values from older versions #}
+                    <span class="status {{ status ? 'enabled' : 'off' }}"></span>
+                    {% if status %}
+                        {{ "Up to date"|t('search-with-elastic') }}
+                    {% elseif not dateUpdated %}
+                        {{ "Not indexed"|t('search-with-elastic') }}
+                    {% else %}
+                        {{ "Out of date"|t('search-with-elastic') }}
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="elasticsearch-date-field" class="field" style="{{ (not disabledType and dateUpdated) ? '' : 'display: none;' }}">
+        <div class="heading">
+            <label>Craft updated at</label>
+        </div>
+        <div class="input ltr" id="elasticsearch-date-content">
+            {{ dateUpdated ?: '' }}
+        </div>
+    </div>
+
+    <div id="elasticsearch-revision-field" class="field" style="{{ revisionNum ? '' : 'display: none;' }}">
+        <div class="heading">
+            <label>Revision</label>
+        </div>
+        <div class="input ltr" id="elasticsearch-revision-content">
+            {{ revisionNum ?: '' }}
+        </div>
+    </div>
+
+    {% if not disabledType and element and currentUser.can('search-with-elastic:index-element') %}
+    <div class="field">
+        <div class="heading">
+            <label>Actions</label>
+        </div>
+        <div class="input ltr">
+            <div class="btngroup">
+                <button type="button" class="btn small" id="elasticsearch-reindex-btn-{{ element.id }}-{{ element.siteId }}"
+                        data-element-id="{{ element.id }}"
+                        data-site-id="{{ element.siteId }}"
+                        data-element-type="{{ className(element) }}"
+                        data-csrf="{{ craft.app.request.csrfToken }}">
+                    {{ "Re-index"|t('search-with-elastic') }}
+                </button>
+                <button type="button" class="btn small submit" id="elasticsearch-delete-btn-{{ element.id }}-{{ element.siteId }}"
+                        data-element-id="{{ element.id }}"
+                        data-site-id="{{ element.siteId }}"
+                        data-element-type="{{ className(element) }}"
+                        data-csrf="{{ craft.app.request.csrfToken }}"
+                        style="background-color: var(--primary-color); color: var(--white);">
+                    {{ "Delete"|t('search-with-elastic') }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {# JavaScript for element indexing actions and live updates #}
+    {% js %}
+    document.addEventListener('DOMContentLoaded', function() {
+        var elementId = '{{ element.id }}';
+        var siteId = '{{ element.siteId }}';
+        var elementType = '{{ className(element)|replace('\\', '\\\\') }}';
+        var csrfToken = '{{ craft.app.request.csrfToken }}';
+
+        var reindexBtn = document.getElementById('elasticsearch-reindex-btn-' + elementId + '-' + siteId);
+        var deleteBtn = document.getElementById('elasticsearch-delete-btn-' + elementId + '-' + siteId);
+
+        /**
+         * Update the sidebar display with fresh status data
+         */
+        function updateSidebarStatus() {
+            var formData = new FormData();
+            formData.append('{{ craft.app.config.general.csrfTokenName }}', csrfToken);
+            formData.append('elementId', elementId);
+            formData.append('siteId', siteId);
+            formData.append('elementType', elementType);
+
+            fetch('{{ actionUrl('search-with-elastic/cp/get-element-status') }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    response.json().then(function(data) {
+                        if (data.success) {
+                            updateStatusDisplay(data);
+                        }
+                    });
+                }
+            })
+            .catch(function(error) {
+                console.error('Error updating status:', error);
+            });
+        }
+
+        /**
+         * Update the status display elements
+         */
+        function updateStatusDisplay(data) {
+            // Update status content
+            var statusContent = document.getElementById('elasticsearch-status-content');
+            if (statusContent) {
+                var statusHtml = '';
+                if (data.disabledType) {
+                    statusHtml = '<span class="status disabled"></span> {{ "Disabled Type"|t('search-with-elastic') }}';
+                } else {
+                    switch (data.status) {
+                        case 'indexed':
+                            statusHtml = '<span class="status enabled"></span> {{ "Indexed"|t('search-with-elastic') }}';
+                            break;
+                        case 'partial':
+                            statusHtml = '<span class="status pending"></span> {{ "Partial Index"|t('search-with-elastic') }}';
+                            break;
+                        case 'outdated':
+                            statusHtml = '<span class="status expired"></span> {{ "Outdated"|t('search-with-elastic') }}';
+                            break;
+                        case 'not_indexed':
+                            statusHtml = '<span class="status off"></span> {{ "Not Indexed"|t('search-with-elastic') }}';
+                            break;
+                    }
+                }
+                statusContent.innerHTML = statusHtml;
+            }
+
+            // Update date field
+            var dateField = document.getElementById('elasticsearch-date-field');
+            var dateContent = document.getElementById('elasticsearch-date-content');
+            if (dateField && dateContent) {
+                if (!data.disabledType && data.dateUpdated) {
+                    dateField.style.display = '';
+                    dateContent.textContent = data.dateUpdated;
+                } else {
+                    dateField.style.display = 'none';
+                    dateContent.textContent = '';
+                }
+            }
+
+            // Update revision field
+            var revisionField = document.getElementById('elasticsearch-revision-field');
+            var revisionContent = document.getElementById('elasticsearch-revision-content');
+            if (revisionField && revisionContent) {
+                if (data.revisionNum) {
+                    revisionField.style.display = '';
+                    revisionContent.textContent = data.revisionNum;
+                } else {
+                    revisionField.style.display = 'none';
+                    revisionContent.textContent = '';
+                }
+            }
+        }
+
+        /**
+         * Handle re-index button clicks
+         */
+        if (reindexBtn) {
+            reindexBtn.addEventListener('click', function() {
+                var btn = this;
+                var originalText = btn.textContent;
+
+                // Update button state
+                btn.disabled = true;
+                btn.textContent = '{{ "Re-indexing..."|t('search-with-elastic') }}';
+
+                var formData = new FormData();
+                formData.append('{{ craft.app.config.general.csrfTokenName }}', csrfToken);
+                formData.append('elementId', elementId);
+                formData.append('siteId', siteId);
+                formData.append('elementType', elementType);
+
+                fetch('{{ actionUrl('search-with-elastic/cp/reindex-single-element') }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(response) {
+                    if (response.ok) {
+                        response.json().then(function(data) {
+                            if (data.success) {
+                                if (data.status === 'partial') {
+                                    Craft.cp.displayNotice(data.warning || data.message || '{{ "Element re-indexed with warnings."|t('search-with-elastic') }}');
+                                } else if (data.skipped) {
+                                    Craft.cp.displayNotice(data.message || '{{ "Element was skipped."|t('search-with-elastic') }}');
+                                } else {
+                                    Craft.cp.displayNotice(data.message || '{{ "Element successfully re-indexed."|t('search-with-elastic') }}');
+                                }
+
+                                // Update status display instead of reloading
+                                setTimeout(updateSidebarStatus, 500);
+                            } else {
+                                Craft.cp.displayError(data.error || data.message || '{{ "Failed to re-index element."|t('search-with-elastic') }}');
+                            }
+                        });
+                    } else {
+                        throw new Error('Network response was not ok');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    Craft.cp.displayError('{{ "Failed to re-index element."|t('search-with-elastic') }}');
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+            });
+        }
+
+        /**
+         * Handle delete button clicks
+         */
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                if (!confirm('{{ "Are you sure you want to remove this element from the Elasticsearch index?"|t('search-with-elastic') }}')) {
+                    return;
+                }
+
+                var btn = this;
+                var originalText = btn.textContent;
+
+                // Update button state
+                btn.disabled = true;
+                btn.textContent = '{{ "Deleting..."|t('search-with-elastic') }}';
+
+                var formData = new FormData();
+                formData.append('{{ craft.app.config.general.csrfTokenName }}', csrfToken);
+                formData.append('elementId', elementId);
+                formData.append('siteId', siteId);
+                formData.append('elementType', elementType);
+
+                fetch('{{ actionUrl('search-with-elastic/cp/delete-single-element') }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(response) {
+                    if (response.ok) {
+                        response.json().then(function(data) {
+                            if (data.success) {
+                                Craft.cp.displayNotice(data.message || '{{ "Element deleted from index."|t('search-with-elastic') }}');
+
+                                // Update status display to show deletion
+                                setTimeout(updateSidebarStatus, 500);
+                            } else {
+                                Craft.cp.displayError(data.error || '{{ "Failed to delete element from index."|t('search-with-elastic') }}');
+                            }
+                        });
+                    } else {
+                        throw new Error('Network response was not ok');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    Craft.cp.displayError('{{ "Failed to delete element from index."|t('search-with-elastic') }}');
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+            });
+        }
+    });
+    {% endjs %}
+    {% endif %}
+</div>

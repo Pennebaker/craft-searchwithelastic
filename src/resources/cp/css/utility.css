@@ -1,0 +1,37 @@
+/**
+ * Search w/Elastic plugin for Craft CMS 4.x
+ *
+ * Utility-specific styles for the reindex utility
+ */
+
+/* Failed entries container using Craft 5 error styling */
+.failed-entries-container {
+    margin-top: 20px;
+}
+
+.failed-entries-container h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.failed-entries-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.failed-entries-list li {
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--hairline-color);
+}
+
+.failed-entries-list li:last-child {
+    border-bottom: none;
+}
+
+.failed-entries-list .error-message {
+    font-style: italic;
+    opacity: 0.8;
+}

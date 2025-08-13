@@ -1,0 +1,1138 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Search w/Elastic plugin for Craft CMS 4.x
+ *
+ * Provides high-performance search across all content types with real-time
+ * indexing, advanced querying, and production reliability.
+ *
+ * @link https://www.pennebaker.com
+ * @copyright Copyright (c) 2025 Pennebaker
+ */
+#}
+
+{#
+/**
+ * Plugin Settings Interface
+ *
+ * Comprehensive configuration interface for the Search w/Elastic plugin.
+ * Provides settings for Elasticsearch connection, index configuration,
+ * element type filtering, frontend content fetching, and Commerce integration.
+ *
+ * Features dynamic preview updates for index names and visual indicators
+ * for configuration file overrides. Supports multi-site configurations
+ * and extensive element type customization.
+ *
+ * @var SettingsModel settings - Plugin settings model instance
+ * @var array overrides - Array of setting keys overridden by config files
+ */
+#}
+
+{% import "_includes/forms" as forms %}
+{% import "search-with-elastic/cp/macros" as macros %}
+
+{% css %}
+/* Configuration override alert styling */
+.config-override-alert {
+    display: inline-block;
+    margin-left: 4px;
+    vertical-align: middle;
+    cursor: help;
+}
+
+.config-override-alert svg {
+    display: block;
+}
+
+{% endcss %}
+<div>
+    <h2>{{ 'Elasticsearch connection'|t('search-with-elastic') }}</h2>
+
+    {% if settings['elasticsearchComponentConfig'] is not null %}
+        <p class="warning with-icon">
+            {{ 'These settings will be ignored since'|t('search-with-elastic') }}
+            <span class="code">elasticsearchComponentConfig</span>
+            {{ 'is present in the configuration file.'|t('search-with-elastic') }}
+        </p>
+    {% endif %}
+
+    {% if settings.hasErrors('global') %}
+        {% include "_includes/forms/errorList" with { errors: settings.getErrors('global') } %}
+    {% endif %}
+
+    {% if 'elasticsearchEndpoint' in overrides or 'isAuthEnabled' in overrides or 'username' in overrides or 'password' in overrides %}
+        <p class="warning with-icon">{{ 'Connection settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Configure your Elasticsearch cluster connection settings.'|t('search-with-elastic') }}</p>
+
+    <table class="editable fullwidth">
+        <thead>
+            <tr>
+                <th>
+                    {{ 'Elasticsearch endpoint URL'|t('search-with-elastic') }}
+                    {% if 'elasticsearchEndpoint' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th>
+                    {{ 'Authentication required'|t('search-with-elastic') }}
+                    {% if 'isAuthEnabled' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    {{ forms.autosuggestField({
+                        id: 'elasticsearchEndpoint',
+                        name: 'elasticsearchEndpoint',
+                        value: settings['elasticsearchEndpoint'],
+                        placeholder: 'elasticsearch:9200',
+                        suggestEnvVars: true,
+                        errors: settings.getErrors('elasticsearchEndpoint'),
+                        disabled: 'elasticsearchEndpoint' in overrides or 'elasticsearchComponentConfig' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    {{ forms.booleanMenuField({
+                        id: 'isAuthEnabled',
+                        name: 'isAuthEnabled',
+                        value: settings['isAuthEnabled'],
+                        yesLabel: 'Yes'|t('search-with-elastic'),
+                        noLabel: 'No'|t('search-with-elastic'),
+                        includeEnvVars: true,
+                        toggle: 'auth_settings',
+                        disabled: 'isAuthEnabled' in overrides or 'elasticsearchComponentConfig' in overrides,
+                    }) }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div id="auth_settings"{% if not settings['isAuthEnabled'] %} class="hidden" {% endif %}>
+        <table class="editable fullwidth" style="margin-top: 14px;">
+            <thead>
+                <tr>
+                    <th>
+                        {{ 'Username'|t('search-with-elastic') }}
+                        {% if 'username' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                    </th>
+                    <th>
+                        {{ 'Password'|t('search-with-elastic') }}
+                        {% if 'password' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="{{ 'username' in overrides or 'elasticsearchComponentConfig' in overrides ? 'disabled' : '' }}">
+                        {{ forms.autosuggestField({
+                            id: 'username',
+                            name: 'username',
+                            value: settings['username'],
+                            suggestEnvVars: true,
+                            errors: settings.getErrors('username'),
+                            disabled: 'username' in overrides or 'elasticsearchComponentConfig' in overrides,
+                        }) }}
+                    </td>
+                    <td class="{{ 'password' in overrides or 'elasticsearchComponentConfig' in overrides ? 'disabled' : '' }}">
+                        {{ forms.autosuggestField({
+                            id: 'password',
+                            name: 'password',
+                            value: settings['password'],
+                            suggestEnvVars: true,
+                            errors: settings.getErrors('password'),
+                            disabled: 'password' in overrides or 'elasticsearchComponentConfig' in overrides,
+                        }) }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>{{ 'Index Configuration'|t('search-with-elastic') }}</h2>
+    {% if 'indexPrefix' in overrides or 'fallbackIndexName' in overrides %}
+        <p class="warning with-icon">{{ 'Index configuration settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Configure index naming: the prefix is prepended to all indexes, while the fallback name is used when no element-specific override is set. The site ID is automatically appended (e.g., "craft-elements_1").'|t('search-with-elastic') }}</p>
+
+    <table class="editable fullwidth">
+        <thead>
+            <tr>
+                <th>
+                    {{ 'Index Prefix'|t('search-with-elastic') }}
+                    {% if 'indexPrefix' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th>
+                    {{ 'Fallback Index Name'|t('search-with-elastic') }}
+                    {% if 'fallbackIndexName' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th>{{ 'Generated Index Preview'|t('search-with-elastic') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="code {{ 'indexPrefix' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'indexPrefix',
+                        name: 'indexPrefix',
+                        value: settings.indexPrefix,
+                        placeholder: 'craft-',
+                        errors: settings.getErrors('indexPrefix'),
+                        disabled: 'indexPrefix' in overrides,
+                    }) }}
+                </td>
+                <td class="code {{ 'fallbackIndexName' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'fallbackIndexName',
+                        name: 'fallbackIndexName',
+                        value: settings.fallbackIndexName,
+                        placeholder: 'elements',
+                        errors: settings.getErrors('fallbackIndexName'),
+                        disabled: 'fallbackIndexName' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    <code id="index-example">{{ settings.indexPrefix }}{{ settings.fallbackIndexName }}_1</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+
+    <h3>{{ 'Element Type Index Overrides'|t('search-with-elastic') }}</h3>
+    {% if 'elementTypeIndexNames' in overrides %}
+        <p class="warning with-icon">{{ 'Element type index name settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Configure specific index names for element types. Leave blank to use the fallback name. Site ID will be automatically appended.'|t('search-with-elastic') }}</p>
+
+    <table class="editable fullwidth">
+        <thead>
+            <tr>
+                <th scope="col" class="heading-cell thin">{{ 'Element Type'|t('search-with-elastic') }}</th>
+                <th scope="col">
+                    {{ 'Index Name Override'|t('search-with-elastic') }}
+                    {% if 'elementTypeIndexNames' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th scope="col">{{ 'Generated Index Preview'|t('search-with-elastic') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <th scope="row" class="heading-cell thin">{{ 'Entries'|t('search-with-elastic') }}</th>
+                <td  class="code {{ 'elementTypeIndexNames' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'elementTypeIndexNames-entries',
+                        name: 'elementTypeIndexNames[craft\\elements\\Entry]',
+                        value: settings.elementTypeIndexNames['craft\\elements\\Entry'] ?? '',
+                        placeholder: '(uses fallback)',
+                        size: 20,
+                        disabled: 'elementTypeIndexNames' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    <code id="entries-preview">{% set entriesOverride = settings.elementTypeIndexNames['craft\\elements\\Entry'] ?? '' %}{{ settings.indexPrefix }}{{ entriesOverride ?: settings.fallbackIndexName }}_1</code>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="heading-cell thin">{{ 'Assets'|t('search-with-elastic') }}</th>
+                <td class="code {{ 'elementTypeIndexNames' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'elementTypeIndexNames-assets',
+                        name: 'elementTypeIndexNames[craft\\elements\\Asset]',
+                        value: settings.elementTypeIndexNames['craft\\elements\\Asset'] ?? '',
+                        placeholder: '(uses fallback)',
+                        size: 20,
+                        disabled: 'elementTypeIndexNames' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    <code id="assets-preview">{% set assetsOverride = settings.elementTypeIndexNames['craft\\elements\\Asset'] ?? '' %}{{ settings.indexPrefix }}{{ assetsOverride ?: settings.fallbackIndexName }}_1</code>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="heading-cell thin">{{ 'Categories'|t('search-with-elastic') }}</th>
+                <td class="code {{ 'elementTypeIndexNames' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'elementTypeIndexNames-categories',
+                        name: 'elementTypeIndexNames[craft\\elements\\Category]',
+                        value: settings.elementTypeIndexNames['craft\\elements\\Category'] ?? '',
+                        placeholder: '(uses fallback)',
+                        size: 20,
+                        disabled: 'elementTypeIndexNames' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    <code id="categories-preview">{% set categoriesOverride = settings.elementTypeIndexNames['craft\\elements\\Category'] ?? '' %}{{ settings.indexPrefix }}{{ categoriesOverride ?: settings.fallbackIndexName }}_1</code>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="heading-cell thin">{{ 'Commerce Products'|t('search-with-elastic') }}</th>
+                <td class="code {{ 'elementTypeIndexNames' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'elementTypeIndexNames-products',
+                        name: 'elementTypeIndexNames[craft\\commerce\\elements\\Product]',
+                        value: settings.elementTypeIndexNames['craft\\commerce\\elements\\Product'] ?? '',
+                        placeholder: '(uses fallback)',
+                        size: 20,
+                        disabled: 'elementTypeIndexNames' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    <code id="products-preview">{% set productsOverride = settings.elementTypeIndexNames['craft\\commerce\\elements\\Product'] ?? '' %}{{ settings.indexPrefix }}{{ productsOverride ?: settings.fallbackIndexName }}_1</code>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="heading-cell thin">{{ 'Digital Products'|t('search-with-elastic') }}</th>
+                <td class="code {{ 'elementTypeIndexNames' in overrides ? 'disabled' : '' }}">
+                    {{ forms.textField({
+                        id: 'elementTypeIndexNames-digitalproducts',
+                        name: 'elementTypeIndexNames[craft\\digitalproducts\\elements\\Product]',
+                        value: settings.elementTypeIndexNames['craft\\digitalproducts\\elements\\Product'] ?? '',
+                        placeholder: '(uses fallback)',
+                        size: 20,
+                        disabled: 'elementTypeIndexNames' in overrides,
+                    }) }}
+                </td>
+                <td class="leftalign">
+                    <code id="digitalproducts-preview">{% set digitalProductsOverride = settings.elementTypeIndexNames['craft\\digitalproducts\\elements\\Product'] ?? '' %}{{ settings.indexPrefix }}{{ digitalProductsOverride ?: settings.fallbackIndexName }}_1</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>{{ 'Search term highlight'|t('search-with-elastic') }}</h2>
+    {% if 'highlight' in overrides %}
+        <p class="warning with-icon">{{ 'The highlight settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p>{{ 'HTML tags used to wrap the search term in order to highlight it in  the search results'|t('search-with-elastic') }}</p>
+    {{ forms.textField({
+        label:    'Before'|t('search-with-elastic'),
+        id:       'highlight_pre_tags',
+        name:     'highlight[pre_tags]',
+        value:    settings['highlight']['pre_tags'],
+        errors:   settings.getErrors('highlight_pre_tags'),
+        disabled: 'highlight' in overrides,
+    }) }}
+
+    {{ forms.textField({
+        label:    'After'|t('search-with-elastic'),
+        id:       'highlight_post_tags',
+        name:     'highlight[post_tags]',
+        value:    settings['highlight']['post_tags'],
+        errors:   settings.getErrors('highlight_post_tags'),
+        disabled: 'highlight' in overrides,
+    }) }}
+
+    <hr>
+
+    <h2>{{ 'Frontend Content Fetching'|t('search-with-elastic') }}</h2>
+    {% if 'enableFrontendFetching' in overrides %}
+        <p class="warning with-icon">{{ 'The "Enable Frontend Content Fetching" setting is being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    {% if 'indexElementsWithoutUrls' in overrides %}
+        <p class="warning with-icon">{{ 'The "Index Elements Without URLs" setting is being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Configure how the plugin fetches content from element URLs for indexing.'|t('search-with-elastic') }}</p>
+
+    {{ forms.lightswitchField({
+        label:        'Enable Frontend Content Fetching'|t('search-with-elastic'),
+        instructions: 'When enabled, the plugin will fetch content by making HTTP requests to element URLs. When disabled, elements will be indexed with basic metadata only.'|t('search-with-elastic'),
+        id:           'enableFrontendFetching',
+        name:         'enableFrontendFetching',
+        on:           settings['enableFrontendFetching'],
+        disabled:     'enableFrontendFetching' in overrides,
+    }) }}
+
+    {{ forms.lightswitchField({
+        label:        'Index Elements Without URLs'|t('search-with-elastic'),
+        instructions: 'When enabled, elements without URLs will still be indexed using their basic metadata. When disabled, elements without URLs will be skipped entirely.'|t('search-with-elastic'),
+        id:           'indexElementsWithoutUrls',
+        name:         'indexElementsWithoutUrls',
+        on:           settings['indexElementsWithoutUrls'],
+        disabled:     'indexElementsWithoutUrls' in overrides,
+    }) }}
+
+    <hr>
+
+    <h2>{{ 'Entry types configuration'|t('search-with-elastic') }}</h2>
+    {% if 'excludedEntryTypes' in overrides and 'excludedFrontendFetchingEntryTypes' in overrides %}
+        <p class="warning with-icon">{{ 'Entry type settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% else %}
+        {% set warnings = [] %}
+        {% if 'excludedEntryTypes' in overrides %}
+            {% set warnings = warnings|merge(['"Never Index" column']) %}
+        {% endif %}
+        {% if 'excludedFrontendFetchingEntryTypes' in overrides %}
+            {% set warnings = warnings|merge(['"Skip Frontend Fetch" column']) %}
+        {% endif %}
+        {% if warnings|length > 0 %}
+            <p class="warning with-icon">{{ 'The {columns} {verb} being overridden by the configuration file.'|t('search-with-elastic', {
+                columns: warnings|join(', '),
+                verb: warnings|length == 1 ? 'is' : 'are'
+            }) }}</p>
+        {% endif %}
+    {% endif %}
+    <p class="light">{{ 'Configure indexing and frontend fetching for entry types:'|t('search-with-elastic') }}</p>
+    {# Entry types configuration table with grouped handling #}
+    <div class="field">
+        {# Group entry types by handle to consolidate sections using same entry type #}
+        {% set entryTypeGroups = {} %}
+        {% for section in craft.app.sections.allSections %}
+            {% for entryType in section.entryTypes %}
+                {% set handle = entryType.handle %}
+                {% if entryTypeGroups[handle] is not defined %}
+                    {% set entryTypeGroups = entryTypeGroups|merge({
+                        (handle): {
+                            'name': entryType.name,
+                            'handle': entryType.handle,
+                            'sections': []
+                        }
+                    }) %}
+                {% endif %}
+                {# Track which sections use this entry type for display #}
+                {% set sectionInfo = {
+                    'name': section.name,
+                    'type': section.type
+                } %}
+                {% set updatedSections = entryTypeGroups[handle].sections|merge([sectionInfo]) %}
+                {% set entryTypeGroups = entryTypeGroups|merge({
+                    (handle): entryTypeGroups[handle]|merge({
+                        'sections': updatedSections
+                    })
+                }) %}
+            {% endfor %}
+        {% endfor %}
+
+        <table id="entryTypes" class="editable fullwidth">
+            <thead>
+            <tr>
+                <th scope="col" class="thin">{{ 'Handle'|t('search-with-elastic') }}</th>
+                <th scope="col">{{ 'Entry Type'|t('search-with-elastic') }}</th>
+                <th scope="col">{{ 'Used In Sections'|t('search-with-elastic') }}</th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Never Index'|t('search-with-elastic') }}
+                    {% if 'excludedEntryTypes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Skip Frontend Fetch'|t('search-with-elastic') }}
+                    {% if 'excludedFrontendFetchingEntryTypes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for handle, entryTypeData in entryTypeGroups %}
+                <tr data-id="default">
+                    <th>{{ entryTypeData.handle }}</th>
+                    <td class="leftalign">{{ entryTypeData.name }}</td>
+                    <td class="leftalign">
+                        {% for section in entryTypeData.sections %}
+                            <span class="badge" style="background-color: #f5f5f5; color: #666; border: 1px solid #ddd; border-radius: 12px; padding: 2px 8px; margin-right: 4px; margin-bottom: 2px; display: inline-block; font-size: 11px; font-weight: 500;">
+                                {{ section.name }} <em style="font-style: normal; opacity: 0.7;">({{ section.type|capitalize }})</em>
+                            </span>
+                        {% endfor %}
+                    </td>
+                    <td class="centeralign {{ 'excludedEntryTypes' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "excludedEntryTypes[]",
+                            value: entryTypeData.handle,
+                            on:    entryTypeData.handle in settings['excludedEntryTypes'],
+                            small: true,
+                            disabled: 'excludedEntryTypes' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'excludedFrontendFetchingEntryTypes' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "excludedFrontendFetchingEntryTypes[]",
+                            value: entryTypeData.handle,
+                            on:    entryTypeData.handle in settings['excludedFrontendFetchingEntryTypes'],
+                            small: true,
+                            disabled: 'excludedFrontendFetchingEntryTypes' in overrides,
+                        }) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h3 style="margin-top: 24px;">{{ 'Entry Status Filtering'|t('search-with-elastic') }}</h3>
+    {% if 'indexableEntryStatuses' in overrides %}
+        <p class="warning with-icon">{{ 'Entry status settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Select which entry statuses should be indexed:'|t('search-with-elastic') }}</p>
+    <div class="field">
+        <table class="editable" style="max-width: 600px;">
+            <thead>
+            <tr>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Pending'|t('search-with-elastic') }}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Live'|t('search-with-elastic') }}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Expired'|t('search-with-elastic') }}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Disabled'|t('search-with-elastic') }}
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td class="centeralign {{ 'indexableEntryStatuses' in overrides ? 'disabled' : '' }}">
+                    {{ forms.lightswitch({
+                        name:  "indexableEntryStatuses[]",
+                        value: 'pending',
+                        on:    'pending' in settings['indexableEntryStatuses'],
+                        small: true,
+                        disabled: 'indexableEntryStatuses' in overrides,
+                    }) }}
+                </td>
+                <td class="centeralign {{ 'indexableEntryStatuses' in overrides ? 'disabled' : '' }}">
+                    {{ forms.lightswitch({
+                        name:  "indexableEntryStatuses[]",
+                        value: 'live',
+                        on:    'live' in settings['indexableEntryStatuses'],
+                        small: true,
+                        disabled: 'indexableEntryStatuses' in overrides,
+                    }) }}
+                </td>
+                <td class="centeralign {{ 'indexableEntryStatuses' in overrides ? 'disabled' : '' }}">
+                    {{ forms.lightswitch({
+                        name:  "indexableEntryStatuses[]",
+                        value: 'expired',
+                        on:    'expired' in settings['indexableEntryStatuses'],
+                        small: true,
+                        disabled: 'indexableEntryStatuses' in overrides,
+                    }) }}
+                </td>
+                <td class="centeralign {{ 'indexableEntryStatuses' in overrides ? 'disabled' : '' }}">
+                    {{ forms.lightswitch({
+                        name:  "indexableEntryStatuses[]",
+                        value: 'disabled',
+                        on:    'disabled' in settings['indexableEntryStatuses'],
+                        small: true,
+                        disabled: 'indexableEntryStatuses' in overrides,
+                    }) }}
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>{{ 'Excluded asset volumes'|t('search-with-elastic') }}</h2>
+    {% if 'excludedAssetVolumes' in overrides and 'excludedFrontendFetchingAssetVolumes' in overrides %}
+        <p class="warning with-icon">{{ 'Asset volume settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% elseif 'excludedAssetVolumes' in overrides %}
+        <p class="warning with-icon">{{ 'The "Never Index" column is being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% elseif 'excludedFrontendFetchingAssetVolumes' in overrides %}
+        <p class="warning with-icon">{{ 'The "Skip Frontend Fetch" column is being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+
+    <p class="light">{{ 'Configure indexing and frontend fetching for asset volumes:'|t('search-with-elastic') }}</p>
+    <div class="field">
+        <table id="volumes" class="editable fullwidth">
+            <thead>
+            <tr>
+                <th scope="col" class="thin">{{ 'Handle'|t('search-with-elastic') }}</th>
+                <th scope="col">{{ 'Name'|t('search-with-elastic') }}</th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Never Index'|t('search-with-elastic') }}
+                    {% if 'excludedAssetVolumes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Skip Frontend Fetch'|t('search-with-elastic') }}
+                    {% if 'excludedFrontendFetchingAssetVolumes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for volume in craft.app.volumes.getAllVolumes() %}
+                <tr data-id="default">
+                    <th scope="row"><code>{{ volume.handle }}</code></th>
+                    <td class="leftalign">{{ volume.name }}</td>
+                    <td class="centeralign {{ 'excludedAssetVolumes' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "excludedAssetVolumes[]",
+                            value: volume.handle,
+                            on:    volume.handle in settings['excludedAssetVolumes'],
+                            small: true,
+                            disabled: 'excludedAssetVolumes' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'excludedFrontendFetchingAssetVolumes' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "excludedFrontendFetchingAssetVolumes[]",
+                            value: volume.handle,
+                            on:    volume.handle in settings['excludedFrontendFetchingAssetVolumes'],
+                            small: true,
+                            disabled: 'excludedFrontendFetchingAssetVolumes' in overrides,
+                        }) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>{{ 'Asset kinds configuration'|t('search-with-elastic') }}</h2>
+    <p class="light">{{ 'Configure which asset kinds should be indexed and which should use frontend content fetching.'|t('search-with-elastic') }}</p>
+
+    {% if 'assetKinds' in overrides or 'frontendFetchingAssetKinds' in overrides %}
+        {% set warnings = [] %}
+        {% if 'assetKinds' in overrides %}
+            {% set warnings = warnings|merge(['"Index" column']) %}
+        {% endif %}
+        {% if 'frontendFetchingAssetKinds' in overrides %}
+            {% set warnings = warnings|merge(['"Frontend Fetch" column']) %}
+        {% endif %}
+        <p class="warning with-icon">{{ 'The {columns} {verb} being overridden by the configuration file.'|t('search-with-elastic', {
+            columns: warnings|join(', '),
+            verb: warnings|length == 1 ? 'is' : 'are'
+        }) }}</p>
+    {% endif %}
+    <div class="field">
+        {# Load asset kinds from plugin configuration including custom types #}
+        {% set assetKindOptions = craft.app.plugins.getPlugin('search-with-elastic').getAllAssetKinds() %}
+
+        {# Text-based asset kinds that support frontend content fetching #}
+        {% set textBasedAssetKinds = craft.app.plugins.getPlugin('search-with-elastic').getTextBasedAssetKinds() %}
+
+        <table id="assetKinds" class="editable fullwidth">
+            <thead>
+            <tr>
+                <th scope="col">{{ 'Asset Kind'|t('search-with-elastic') }}</th>
+                <th scope="col" class="thin">
+                    {{ 'Index'|t('search-with-elastic') }}
+                    {% if 'assetKinds' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th scope="col" class="thin">
+                    {{ 'Frontend Fetch'|t('search-with-elastic') }}
+                    {% if 'frontendFetchingAssetKinds' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for assetKind in assetKindOptions %}
+                <tr data-id="default">
+                    <th scope="row">{{ assetKind|title }}</th>
+                    <td class="centeralign {{ 'assetKinds' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "assetKinds[]",
+                            value: assetKind,
+                            on:    assetKind in settings['assetKinds'],
+                            small: true,
+                            disabled: 'assetKinds' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'frontendFetchingAssetKinds' in overrides ? 'disabled' : '' }}">
+                        {% if assetKind in textBasedAssetKinds %}
+                            {{ forms.lightswitch({
+                                name:  "frontendFetchingAssetKinds[]",
+                                value: assetKind,
+                                on:    assetKind in settings['frontendFetchingAssetKinds'],
+                                small: true,
+                                disabled: 'frontendFetchingAssetKinds' in overrides,
+                            }) }}
+                        {% else %}
+                            <span class="light">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>{{ 'Category groups configuration'|t('search-with-elastic') }}</h2>
+    {% if 'excludedCategoryGroups' in overrides and 'excludedFrontendFetchingCategoryGroups' in overrides %}
+        <p class="warning with-icon">{{ 'Category group settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% else %}
+        {% set warnings = [] %}
+        {% if 'excludedCategoryGroups' in overrides %}
+            {% set warnings = warnings|merge(['"Never Index" column']) %}
+        {% endif %}
+        {% if 'excludedFrontendFetchingCategoryGroups' in overrides %}
+            {% set warnings = warnings|merge(['"Skip Frontend Fetch" column']) %}
+        {% endif %}
+        {% if warnings|length > 0 %}
+            <p class="warning with-icon">{{ 'The {columns} {verb} being overridden by the configuration file.'|t('search-with-elastic', {
+                columns: warnings|join(', '),
+                verb: warnings|length == 1 ? 'is' : 'are'
+            }) }}</p>
+        {% endif %}
+    {% endif %}
+    <p class="light">{{ 'Configure indexing and frontend fetching for category groups:'|t('search-with-elastic') }}</p>
+    <div class="field">
+        <table id="categoryGroups" class="editable fullwidth">
+            <thead>
+            <tr>
+                <th scope="col" class="thin">{{ 'Handle'|t('search-with-elastic') }}</th>
+                <th scope="col">{{ 'Name'|t('search-with-elastic') }}</th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Never Index'|t('search-with-elastic') }}
+                    {% if 'excludedCategoryGroups' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Skip Frontend Fetch'|t('search-with-elastic') }}
+                    {% if 'excludedFrontendFetchingCategoryGroups' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for categoryGroup in craft.app.categories.getAllGroups() %}
+                <tr data-id="default">
+                    <th scope="row"><code>{{ categoryGroup.handle }}</code></th>
+                    <td class="leftalign">{{ categoryGroup.name }}</td>
+                    <td class="centeralign {{ 'excludedCategoryGroups' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "excludedCategoryGroups[]",
+                            value: categoryGroup.handle,
+                            on:    categoryGroup.handle in settings['excludedCategoryGroups'],
+                            small: true,
+                            disabled: 'excludedCategoryGroups' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'excludedFrontendFetchingCategoryGroups' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "excludedFrontendFetchingCategoryGroups[]",
+                            value: categoryGroup.handle,
+                            on:    categoryGroup.handle in settings['excludedFrontendFetchingCategoryGroups'],
+                            small: true,
+                            disabled: 'excludedFrontendFetchingCategoryGroups' in overrides,
+                        }) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h3 style="margin-top: 24px;">{{ 'Category Status Filtering'|t('search-with-elastic') }}</h3>
+    {% if 'indexableCategoryStatuses' in overrides %}
+        <p class="warning with-icon">{{ 'Category status settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Select which category statuses should be indexed:'|t('search-with-elastic') }}</p>
+    <div class="field">
+        <table class="editable" style="max-width: 300px;">
+            <thead>
+            <tr>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Enabled'|t('search-with-elastic') }}
+                </th>
+                <th scope="col" class="thin centeralign">
+                    {{ 'Disabled'|t('search-with-elastic') }}
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td class="centeralign {{ 'indexableCategoryStatuses' in overrides ? 'disabled' : '' }}">
+                    {{ forms.lightswitch({
+                        name:  "indexableCategoryStatuses[]",
+                        value: 'enabled',
+                        on:    'enabled' in settings['indexableCategoryStatuses'],
+                        small: true,
+                        disabled: 'indexableCategoryStatuses' in overrides,
+                    }) }}
+                </td>
+                <td class="centeralign {{ 'indexableCategoryStatuses' in overrides ? 'disabled' : '' }}">
+                    {{ forms.lightswitch({
+                        name:  "indexableCategoryStatuses[]",
+                        value: 'disabled',
+                        on:    'disabled' in settings['indexableCategoryStatuses'],
+                        small: true,
+                        disabled: 'indexableCategoryStatuses' in overrides,
+                    }) }}
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {% set commercePlugin = craft.app.plugins.getPlugin('commerce') %}
+    {% if commercePlugin and commercePlugin.isInstalled %}
+        <hr>
+
+        <h2>{{ 'Product types configuration'|t('search-with-elastic') }}</h2>
+        {% if 'excludedProductTypes' in overrides and 'excludedFrontendFetchingProductTypes' in overrides %}
+            <p class="warning with-icon">{{ 'Product type settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+        {% else %}
+            {% set warnings = [] %}
+            {% if 'excludedProductTypes' in overrides %}
+                {% set warnings = warnings|merge(['"Never Index" column']) %}
+            {% endif %}
+            {% if 'excludedFrontendFetchingProductTypes' in overrides %}
+                {% set warnings = warnings|merge(['"Skip Frontend Fetch" column']) %}
+            {% endif %}
+            {% if warnings|length > 0 %}
+                <p class="warning with-icon">{{ 'The {columns} {verb} being overridden by the configuration file.'|t('search-with-elastic', {
+                    columns: warnings|join(', '),
+                    verb: warnings|length == 1 ? 'is' : 'are'
+                }) }}</p>
+            {% endif %}
+        {% endif %}
+        <p class="light">{{ 'Configure indexing and frontend fetching for product types:'|t('search-with-elastic') }}</p>
+        <div class="field">
+            <table id="productTypes" class="editable fullwidth">
+                <thead>
+                <tr>
+                    <th scope="col" class="thin">{{ 'Handle'|t('search-with-elastic') }}</th>
+                    <th scope="col">{{ 'Name'|t('search-with-elastic') }}</th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Never Index'|t('search-with-elastic') }}
+                        {% if 'excludedProductTypes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Skip Frontend Fetch'|t('search-with-elastic') }}
+                        {% if 'excludedFrontendFetchingProductTypes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for productType in craft.app.plugins.getPlugin('commerce').getProductTypes().getAllProductTypes() %}
+                    <tr data-id="default">
+                        <th scope="row"><code>{{ productType.handle }}</code></th>
+                        <td class="leftalign">{{ productType.name }}</td>
+                        <td class="centeralign {{ 'excludedProductTypes' in overrides ? 'disabled' : '' }}">
+                            {{ forms.lightswitch({
+                                name:  "excludedProductTypes[]",
+                                value: productType.handle,
+                                on:    productType.handle in settings['excludedProductTypes'],
+                                small: true,
+                                disabled: 'excludedProductTypes' in overrides,
+                            }) }}
+                        </td>
+                        <td class="centeralign {{ 'excludedFrontendFetchingProductTypes' in overrides ? 'disabled' : '' }}">
+                            {{ forms.lightswitch({
+                                name:  "excludedFrontendFetchingProductTypes[]",
+                                value: productType.handle,
+                                on:    productType.handle in settings['excludedFrontendFetchingProductTypes'],
+                                small: true,
+                                disabled: 'excludedFrontendFetchingProductTypes' in overrides,
+                            }) }}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h3 style="margin-top: 24px;">{{ 'Product Status Filtering'|t('search-with-elastic') }}</h3>
+        {% if 'indexableProductStatuses' in overrides %}
+            <p class="warning with-icon">{{ 'Product status settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+        {% endif %}
+        <p class="light">{{ 'Select which product statuses should be indexed:'|t('search-with-elastic') }}</p>
+        <div class="field">
+            <table class="editable" style="max-width: 600px;">
+                <thead>
+                <tr>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Pending'|t('search-with-elastic') }}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Live'|t('search-with-elastic') }}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Expired'|t('search-with-elastic') }}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Disabled'|t('search-with-elastic') }}
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td class="centeralign {{ 'indexableProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableProductStatuses[]",
+                            value: 'pending',
+                            on:    'pending' in settings['indexableProductStatuses'],
+                            small: true,
+                            disabled: 'indexableProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'indexableProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableProductStatuses[]",
+                            value: 'live',
+                            on:    'live' in settings['indexableProductStatuses'],
+                            small: true,
+                            disabled: 'indexableProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'indexableProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableProductStatuses[]",
+                            value: 'expired',
+                            on:    'expired' in settings['indexableProductStatuses'],
+                            small: true,
+                            disabled: 'indexableProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'indexableProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableProductStatuses[]",
+                            value: 'disabled',
+                            on:    'disabled' in settings['indexableProductStatuses'],
+                            small: true,
+                            disabled: 'indexableProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% set digitalProductsPlugin = craft.app.plugins.getPlugin('digital-products') %}
+    {% if digitalProductsPlugin and digitalProductsPlugin.isInstalled %}
+        <hr>
+
+        <h2>{{ 'Digital product types configuration'|t('search-with-elastic') }}</h2>
+        {% if 'excludedDigitalProductTypes' in overrides and 'excludedFrontendFetchingDigitalProductTypes' in overrides %}
+            <p class="warning with-icon">{{ 'Digital product type settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+        {% else %}
+            {% set warnings = [] %}
+            {% if 'excludedDigitalProductTypes' in overrides %}
+                {% set warnings = warnings|merge(['"Never Index" column']) %}
+            {% endif %}
+            {% if 'excludedFrontendFetchingDigitalProductTypes' in overrides %}
+                {% set warnings = warnings|merge(['"Skip Frontend Fetch" column']) %}
+            {% endif %}
+            {% if warnings|length > 0 %}
+                <p class="warning with-icon">{{ 'The {columns} {verb} being overridden by the configuration file.'|t('search-with-elastic', {
+                    columns: warnings|join(', '),
+                    verb: warnings|length == 1 ? 'is' : 'are'
+                }) }}</p>
+            {% endif %}
+        {% endif %}
+        <p class="light">{{ 'Configure indexing and frontend fetching for digital product types:'|t('search-with-elastic') }}</p>
+        <div class="field">
+            <table id="digitalProductTypes" class="editable fullwidth">
+                <thead>
+                <tr>
+                    <th scope="col" class="thin">{{ 'Handle'|t('search-with-elastic') }}</th>
+                    <th scope="col">{{ 'Name'|t('search-with-elastic') }}</th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Never Index'|t('search-with-elastic') }}
+                        {% if 'excludedDigitalProductTypes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Skip Frontend Fetch'|t('search-with-elastic') }}
+                        {% if 'excludedFrontendFetchingDigitalProductTypes' in overrides %}{{ macros.alertTriangle() }}{% endif %}
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for digitalProductType in craft.app.plugins.getPlugin('digital-products').getProductTypes().getAllProductTypes() %}
+                    <tr data-id="default">
+                        <th scope="row"><code>{{ digitalProductType.handle }}</code></th>
+                        <td class="leftalign">{{ digitalProductType.name }}</td>
+                        <td class="centeralign {{ 'excludedDigitalProductTypes' in overrides ? 'disabled' : '' }}">
+                            {{ forms.lightswitch({
+                                name:  "excludedDigitalProductTypes[]",
+                                value: digitalProductType.handle,
+                                on:    digitalProductType.handle in settings['excludedDigitalProductTypes'],
+                                small: true,
+                                disabled: 'excludedDigitalProductTypes' in overrides,
+                            }) }}
+                        </td>
+                        <td class="centeralign {{ 'excludedFrontendFetchingDigitalProductTypes' in overrides ? 'disabled' : '' }}">
+                            {{ forms.lightswitch({
+                                name:  "excludedFrontendFetchingDigitalProductTypes[]",
+                                value: digitalProductType.handle,
+                                on:    digitalProductType.handle in settings['excludedFrontendFetchingDigitalProductTypes'],
+                                small: true,
+                                disabled: 'excludedFrontendFetchingDigitalProductTypes' in overrides,
+                            }) }}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h3 style="margin-top: 24px;">{{ 'Digital Product Status Filtering'|t('search-with-elastic') }}</h3>
+        {% if 'indexableDigitalProductStatuses' in overrides %}
+            <p class="warning with-icon">{{ 'Digital product status settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+        {% endif %}
+        <p class="light">{{ 'Select which digital product statuses should be indexed:'|t('search-with-elastic') }}</p>
+        <div class="field">
+            <table class="editable" style="max-width: 600px;">
+                <thead>
+                <tr>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Pending'|t('search-with-elastic') }}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Live'|t('search-with-elastic') }}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Expired'|t('search-with-elastic') }}
+                    </th>
+                    <th scope="col" class="thin centeralign">
+                        {{ 'Disabled'|t('search-with-elastic') }}
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td class="centeralign {{ 'indexableDigitalProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableDigitalProductStatuses[]",
+                            value: 'pending',
+                            on:    'pending' in settings['indexableDigitalProductStatuses'],
+                            small: true,
+                            disabled: 'indexableDigitalProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'indexableDigitalProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableDigitalProductStatuses[]",
+                            value: 'live',
+                            on:    'live' in settings['indexableDigitalProductStatuses'],
+                            small: true,
+                            disabled: 'indexableDigitalProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'indexableDigitalProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableDigitalProductStatuses[]",
+                            value: 'expired',
+                            on:    'expired' in settings['indexableDigitalProductStatuses'],
+                            small: true,
+                            disabled: 'indexableDigitalProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                    <td class="centeralign {{ 'indexableDigitalProductStatuses' in overrides ? 'disabled' : '' }}">
+                        {{ forms.lightswitch({
+                            name:  "indexableDigitalProductStatuses[]",
+                            value: 'disabled',
+                            on:    'disabled' in settings['indexableDigitalProductStatuses'],
+                            small: true,
+                            disabled: 'indexableDigitalProductStatuses' in overrides,
+                        }) }}
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% include "search-with-elastic/components/elastic-branding" %}
+</div>
+
+{# JavaScript for live index name preview updates #}
+{% js %}
+/**
+ * Initialize live preview functionality for index names
+ * Updates preview text in real-time as users type in prefix/fallback fields
+ */
+function initLivePreview() {
+    // Locate index configuration input fields with fallback selectors
+    var prefixField = document.getElementById('settings-indexPrefix') ||
+                     document.getElementById('indexPrefix') ||
+                     document.querySelector('input[name="indexPrefix"]');
+
+    var fallbackField = document.getElementById('settings-fallbackIndexName') ||
+                       document.getElementById('fallbackIndexName') ||
+                       document.querySelector('input[name="fallbackIndexName"]');
+
+    // Retry initialization if fields haven't loaded yet
+    if (!prefixField || !fallbackField) {
+        setTimeout(initLivePreview, 100);
+        return;
+    }
+
+    // Map element types to their corresponding field and preview elements
+    var elementTypes = {
+        'entries': {
+            fieldId: 'settings-elementTypeIndexNames-entries',
+            previewId: 'settings-entries-preview'
+        },
+        'assets': {
+            fieldId: 'settings-elementTypeIndexNames-assets',
+            previewId: 'settings-assets-preview'
+        },
+        'categories': {
+            fieldId: 'settings-elementTypeIndexNames-categories',
+            previewId: 'settings-categories-preview'
+        },
+        'products': {
+            fieldId: 'settings-elementTypeIndexNames-products',
+            previewId: 'settings-products-preview'
+        },
+        'digitalproducts': {
+            fieldId: 'settings-elementTypeIndexNames-digitalproducts',
+            previewId: 'settings-digitalproducts-preview'
+        }
+    };
+
+    /**
+     * Update all index name previews based on current field values
+     */
+    function updateAllPreviews() {
+        if (!prefixField || !fallbackField) {
+            return;
+        }
+
+        var prefix = prefixField.value || prefixField.placeholder || '';
+        var fallback = fallbackField.value || fallbackField.placeholder || '';
+
+        // Update the main fallback index example
+        var mainExample = document.getElementById('settings-index-example');
+        if (mainExample) {
+            mainExample.textContent = prefix + fallback + '_1';
+        }
+
+        // Update each element type's specific index preview
+        Object.keys(elementTypes).forEach(function(key) {
+            var config = elementTypes[key];
+            var overrideField = document.getElementById(config.fieldId);
+            var previewElement = document.getElementById(config.previewId);
+
+            if (overrideField && previewElement) {
+                var override = overrideField.value || '';
+                var indexName = override || fallback;
+                previewElement.textContent = prefix + indexName + '_1';
+            }
+        });
+    }
+
+    // Listen for changes to main configuration fields
+    if (prefixField) {
+        prefixField.addEventListener('input', updateAllPreviews);
+    }
+    if (fallbackField) {
+        fallbackField.addEventListener('input', updateAllPreviews);
+    }
+
+    // Listen for changes to element type override fields
+    Object.keys(elementTypes).forEach(function(key) {
+        var config = elementTypes[key];
+        var overrideField = document.getElementById(config.fieldId);
+
+        if (overrideField) {
+            overrideField.addEventListener('input', updateAllPreviews);
+        }
+    });
+
+    // Populate previews with current values
+    updateAllPreviews();
+}
+
+// Set up live preview on page load
+document.addEventListener('DOMContentLoaded', initLivePreview);
+window.addEventListener('load', initLivePreview);
+{% endjs %}

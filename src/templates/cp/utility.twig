@@ -1,0 +1,375 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Search w/Elastic plugin for Craft CMS 4.x
+ *
+ * Provides high-performance search across all content types with real-time
+ * indexing, advanced querying, and production reliability.
+ *
+ * @link https://www.pennebaker.com
+ * @copyright Copyright (c) 2025 Pennebaker
+ */
+#}
+
+{#
+/**
+ * Reindex Utility Interface
+ *
+ * Provides a comprehensive interface for managing Elasticsearch reindexing
+ * operations. Features site and element type selection, multiple reindex modes,
+ * and real-time progress tracking with error reporting.
+ *
+ * Supports selective reindexing by site and element type with hierarchical
+ * selection controls and bulk actions. Progress tracking includes speed
+ * calculations, ETA estimates, and detailed error/warning summaries.
+ *
+ * @var bool isConnected - Whether Elasticsearch connection is active
+ * @var bool inSync - Whether index is synchronized with content
+ * @var string notConnectedWarningMessage - Error message for connection issues
+ * @var array sitesWithElementTypes - Sites and their available element types
+ */
+#}
+
+{% do view.registerAssetBundle("pennebaker\\searchwithelastic\\resources\\CpAssetBundle") %}
+{% import "_includes/forms" as forms %}
+
+<div class="search-with-elastic-utility-container">
+    {% if not isConnected %}
+        <p class="error">
+            <strong>{{ notConnectedWarningMessage|raw }}</strong>
+        </p>
+    {% elseif not inSync %}
+        <p class="error">
+            <strong>{{ 'Elasticsearch index is out of sync!'|t('search-with-elastic') }}</strong>
+        </p>
+    {% endif %}
+
+    <form
+            id="search-with-elastic-utility"
+            class="utility"
+            action="{{ actionUrl('search-with-elastic/cp/reindex-perform-action') }}"
+            method="post"
+            accept-charset="UTF-8"
+    >
+        {{ csrfInput() }}
+
+        {# Hidden inputs to ensure empty checkbox groups submit properly #}
+        {% for siteData in sitesWithElementTypes %}
+            <input type="hidden" name="elementTypes[{{ siteData.id }}]" value="">
+        {% endfor %}
+
+        <h2>{{ 'Sites & Element Types'|t('search-with-elastic') }}</h2>
+
+        {% if sitesWithElementTypes|length > 0 %}
+            <table class="data fullwidth">
+                <thead>
+                    <tr>
+                        <th style="width: 20px;" class="checkbox-cell selectallcontainer"></th>
+                        <th>{{ 'Site / Element Type'|t('search-with-elastic') }}</th>
+                        <th>{{ 'Index Name'|t('search-with-elastic') }}</th>
+                        <th class="nowrap">{{ 'Count'|t('search-with-elastic') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for siteData in sitesWithElementTypes %}
+                        {# Site header row #}
+                        <tr class="site-header-row" data-site-id="{{ siteData.id }}">
+                            <td class="checkbox-cell">
+                                <input type="checkbox" class="checkbox site-checkbox"
+                                       data-site-id="{{ siteData.id }}"
+                                       id="site-{{ siteData.id }}">
+                                <label for="site-{{ siteData.id }}"
+                                       title="{{ 'Select site: ' ~ siteData.name }}"></label>
+                            </td>
+                            <th scope="row" class="site-name-cell">
+                                <strong>{{ siteData.name }}</strong>
+                                {% if siteData.elementTypes|length > 0 %}
+                                    {% set totalCount = 0 %}
+                                    {% for elementType in siteData.elementTypes %}
+                                        {% set totalCount = totalCount + elementType.count %}
+                                    {% endfor %}
+                                    <span class="light">({{ totalCount }} elements)</span>
+                                {% endif %}
+                            </th>
+                            <td></td>
+                            <td class="nowrap light">{{ totalCount|number_format }}</td>
+                        </tr>
+
+                        {# Element type rows #}
+                        {% if siteData.elementTypes|length > 0 %}
+                            {% for elementType in siteData.elementTypes %}
+                                <tr class="element-type-row" data-site-id="{{ siteData.id }}">
+                                    <td class="checkbox-cell">
+                                        <input type="checkbox" class="checkbox element-type-checkbox"
+                                               data-site-id="{{ siteData.id }}"
+                                               data-element-type="{{ elementType.type }}"
+                                               name="elementTypes[{{ siteData.id }}][]"
+                                               value="{{ elementType.type }}"
+                                               id="element-{{ siteData.id }}-{{ elementType.type }}"
+                                               checked>
+                                        <label for="element-{{ siteData.id }}-{{ elementType.type }}"
+                                               title="{{ 'Select ' ~ elementType.label }}"></label>
+                                    </td>
+                                    <td style="padding-left: 24px;">{{ elementType.label|replace('(' ~ elementType.count ~ ')', '') }}</td>
+                                    <td class="code">{{ elementType.indexName }}</td>
+                                    <td class="nowrap">{{ elementType.count|number_format }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr class="element-type-row" data-site-id="{{ siteData.id }}">
+                                <td class="checkbox-cell"></td>
+                                <td style="padding-left: 24px;" class="light">{{ 'No indexable elements found'|t('search-with-elastic') }}</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="btngroup bulk-actions-btngroup">
+                <button type="button" class="btn secondary small" id="select-all">{{ 'Select All'|t('search-with-elastic') }}</button>
+                <button type="button" class="btn secondary small" id="deselect-all">{{ 'Deselect All'|t('search-with-elastic') }}</button>
+            </div>
+        {% else %}
+            <p class="light">{{ 'No sites available for indexing'|t('search-with-elastic') }}</p>
+        {% endif %}
+
+        <div class="form-options reindex-form-options">
+            <h3>{{ 'Reindex Mode'|t('search-with-elastic') }}</h3>
+
+            <div class="reindex-mode-options">
+                <div class="btngroup">
+                    <label class="btn mode-btn" data-mode="reset">
+                        <input type="radio" name="reindexMode" value="reset" checked style="display: none;">
+                        {{ 'Reset & Index'|t('search-with-elastic') }}
+                    </label>
+                    <label class="btn mode-btn" data-mode="all">
+                        <input type="radio" name="reindexMode" value="all" style="display: none;">
+                        {{ 'All'|t('search-with-elastic') }}
+                    </label>
+                    <label class="btn mode-btn" data-mode="missing-updated">
+                        <input type="radio" name="reindexMode" value="missing-updated" style="display: none;">
+                        {{ 'Missing & Updated'|t('search-with-elastic') }}
+                    </label>
+                    <label class="btn mode-btn" data-mode="missing">
+                        <input type="radio" name="reindexMode" value="missing" style="display: none;">
+                        {{ 'Missing'|t('search-with-elastic') }}
+                    </label>
+                    <label class="btn mode-btn" data-mode="updated">
+                        <input type="radio" name="reindexMode" value="updated" style="display: none;">
+                        {{ 'Updated'|t('search-with-elastic') }}
+                    </label>
+                </div>
+
+                <div class="mode-descriptions">
+                    <div class="mode-description" data-mode="reset" style="display: block;">
+                        <span class="light">{{ 'Clear index completely, then index only selected sites & element types'|t('search-with-elastic') }}</span>
+                    </div>
+                    <div class="mode-description" data-mode="all" style="display: none;">
+                        <span class="light">{{ 'Reindex all selected sites & element types without clearing the indexes first'|t('search-with-elastic') }}</span>
+                    </div>
+                    <div class="mode-description" data-mode="missing" style="display: none;">
+                        <span class="light">{{ 'From selected sites & element types, only index those not currently in Elasticsearch'|t('search-with-elastic') }}</span>
+                    </div>
+                    <div class="mode-description" data-mode="updated" style="display: none;">
+                        <span class="light">{{ 'From selected sites & element types, only reindex those updated since last index'|t('search-with-elastic') }}</span>
+                    </div>
+                    <div class="mode-description" data-mode="missing-updated" style="display: none;">
+                        <span class="light">{{ 'From selected sites & element types, index missing and reindex updated elements'|t('search-with-elastic') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <input type="submit" class="btn submit"
+                   value="{{ 'Reindex selected'|t('search-with-elastic') }}"/>
+            <div class="utility-status"></div>
+        </div>
+
+        <div class="failed-entries-container" style="display: none;">
+            {# Container for error and warning summaries populated by reindex.js #}
+        </div>
+    </form>
+
+    {% include "search-with-elastic/components/elastic-branding" %}
+</div>
+
+{% css %}
+/* Form layout styling using CraftCMS patterns */
+.reindex-form-options {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--hairline-color);
+}
+
+.reindex-mode-options {
+    margin-top: 12px;
+}
+
+.bulk-actions-btngroup {
+    margin-top: 16px;
+}
+
+/* Reindex mode button styling using CraftCMS patterns */
+.mode-btn.active {
+    background-color: var(--primary-color);
+    color: var(--white);
+    border-color: var(--primary-color);
+}
+
+.mode-btn:hover:not(.active) {
+    background-color: var(--gray-050);
+}
+
+.mode-descriptions {
+    min-height: 20px;
+    margin-top: 8px;
+}
+
+.utility-status {
+    min-height: 40px;
+}
+
+/* Site and element type table styling aligned with CraftCMS */
+.site-header-row {
+    background-color: var(--gray-050);
+    border-top: 1px solid var(--hairline-color);
+}
+
+.site-header-row:first-child {
+    border-top: none;
+}
+
+.site-header-row th {
+    font-weight: 600;
+    padding: 12px 14px;
+}
+
+.element-type-row td:nth-child(2) {
+    border-left: 3px solid var(--hairline-color);
+    margin-left: 20px;
+}
+
+.site-name-cell {
+    position: relative;
+}
+
+.checkbox-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+{% endcss %}
+
+{# JavaScript for utility interface interactions #}
+{% js %}
+// Initialize the reindex utility handler
+new Craft.SearchWithElasticUtility('search-with-elastic-utility');
+
+// Site and element type selection logic
+document.addEventListener('DOMContentLoaded', function() {
+
+    /**
+     * Update site checkbox state based on element type selections
+     * Handles indeterminate state when some but not all types are selected
+     */
+    function updateSiteCheckboxState(siteId) {
+        var siteCheckbox = document.querySelector('.site-checkbox[data-site-id="' + siteId + '"]');
+        var elementTypeCheckboxes = document.querySelectorAll('.element-type-checkbox[data-site-id="' + siteId + '"]');
+
+        if (!siteCheckbox || elementTypeCheckboxes.length === 0) return;
+
+        var checkedCount = Array.from(elementTypeCheckboxes).filter(function(cb) {
+            return cb.checked;
+        }).length;
+        var totalCount = elementTypeCheckboxes.length;
+
+        if (checkedCount === 0) {
+            siteCheckbox.checked = false;
+            siteCheckbox.indeterminate = false;
+        } else if (checkedCount === totalCount) {
+            siteCheckbox.checked = true;
+            siteCheckbox.indeterminate = false;
+        } else {
+            siteCheckbox.checked = false;
+            siteCheckbox.indeterminate = true;
+        }
+    }
+
+    // Set initial site checkbox states based on element type selections
+    document.querySelectorAll('.site-checkbox').forEach(function(siteCheckbox) {
+        updateSiteCheckboxState(siteCheckbox.getAttribute('data-site-id'));
+    });
+
+    // Site checkbox handler: toggles all element types when site is checked/unchecked
+    document.querySelectorAll('.site-checkbox').forEach(function(siteCheckbox) {
+        siteCheckbox.addEventListener('change', function() {
+            var siteId = this.getAttribute('data-site-id');
+            var elementTypeCheckboxes = document.querySelectorAll('.element-type-checkbox[data-site-id="' + siteId + '"]');
+
+            // Set all element types to match site checkbox state
+            var shouldCheck = this.checked;
+            elementTypeCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = shouldCheck;
+            });
+
+            // Update visual appearance
+            updateSiteCheckboxState(siteId);
+        });
+    });
+
+    // Element type handler: updates parent site checkbox when types change
+    document.querySelectorAll('.element-type-checkbox').forEach(function(elementCheckbox) {
+        elementCheckbox.addEventListener('change', function() {
+            // Update parent site checkbox
+            updateSiteCheckboxState(this.getAttribute('data-site-id'));
+        });
+    });
+
+    // Bulk selection controls for all sites and element types
+    document.getElementById('select-all')?.addEventListener('click', function() {
+        document.querySelectorAll('.element-type-checkbox').forEach(function(cb) {
+            cb.checked = true;
+        });
+        document.querySelectorAll('.site-checkbox').forEach(function(siteCheckbox) {
+            updateSiteCheckboxState(siteCheckbox.getAttribute('data-site-id'));
+        });
+    });
+
+    document.getElementById('deselect-all')?.addEventListener('click', function() {
+        document.querySelectorAll('.element-type-checkbox').forEach(function(cb) {
+            cb.checked = false;
+        });
+        document.querySelectorAll('.site-checkbox').forEach(function(siteCheckbox) {
+            updateSiteCheckboxState(siteCheckbox.getAttribute('data-site-id'));
+        });
+    });
+
+    // Reindex mode selection with visual feedback and descriptions
+    document.querySelectorAll('.mode-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var mode = this.dataset.mode;
+            var radio = this.querySelector('input[type="radio"]');
+
+            // Select the clicked radio button
+            radio.checked = true;
+
+            // Update visual active state for button group
+            document.querySelectorAll('.mode-btn').forEach(function(b) {
+                b.classList.remove('active');
+            });
+            this.classList.add('active');
+
+            // Display description text for selected mode
+            document.querySelectorAll('.mode-description').forEach(function(desc) {
+                desc.style.display = 'none';
+            });
+            document.querySelector('.mode-description[data-mode="' + mode + '"]').style.display = 'block';
+        });
+    });
+
+    // Set default selection to 'Reset & Index' mode
+    document.querySelector('.mode-btn[data-mode="reset"]').classList.add('active');
+});
+{% endjs %}
