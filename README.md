@@ -1,6 +1,6 @@
 # Search with Elastic
 
-An Elasticsearch integration for Craft CMS 4.x that provides comprehensive search capabilities for your content. This plugin indexes entries, assets, commerce products, and custom content types while providing fast search results with advanced features like fuzzy matching, faceted filtering, and relevance scoring. Built for scalability, it handles real-time content updates and supports complex queries across large datasets.
+An Elasticsearch integration for Craft CMS 4.x that provides comprehensive search capabilities for your content. This plugin indexes entries, assets, and commerce products while providing fast search results with advanced features like fuzzy matching, faceted filtering, and relevance scoring. Built for scalability, it handles real-time content updates and supports complex queries across large datasets.
 
 ## Features
 
@@ -10,17 +10,16 @@ An Elasticsearch integration for Craft CMS 4.x that provides comprehensive searc
 - **Advanced Search**: Powerful search capabilities with highlighting and relevance scoring
 - **Flexible Configuration**: Extensive configuration options for fine-tuned control
 - **Frontend Content Fetching**: Automatically fetch and index rendered HTML content
-- **Asset Text Extraction**: Extract searchable text from PDFs and documents
+- **Asset Text Extraction**: Extract searchable text from supported documents
 - **Multi-Site Support**: Full support for Craft's multi-site architecture
 - **CP Integration**: Control panel utilities and element sidebar status
 - **Developer Friendly**: Rich API, events, and Twig variables for customization
 
 ## Requirements
 
-- Craft CMS 4.0+
-- PHP 8.0+
+- Craft CMS 4.x
+- PHP 8.x
 - Elasticsearch 7.x
-- `yiisoft/yii2-elasticsearch` package (included)
 
 ## Installation
 
@@ -32,7 +31,7 @@ composer require pennebaker/craft-searchwithelastic
 
 ### Via Control Panel
 
-1. Go to **Settings** → **Plugins**
+1. Go to **Plugins Store**
 2. Search for "Search with Elastic"
 3. Click **Install**
 
@@ -127,45 +126,22 @@ $results = SearchWithElastic::getInstance()->searchTemplate->executeTemplate(
 );
 ```
 
-### Comprehensive Validation
-All inputs are validated through multiple security layers before processing.
-
 ## Documentation
 
-### Getting Started
-- [Installation](docs/getting-started/installation.md) - Setup instructions
-- [Quick Start](docs/getting-started/quick-start.md) - Get up and running fast
-- [Requirements](docs/getting-started/requirements.md) - System requirements
+View the documentation at **[searchwithelastic.pennebaker.io](https://searchwithelastic.pennebaker.io)**
 
-### Configuration
-- [Basic Setup](docs/configuration/basic-setup.md) - Essential configuration
-- [Environment Config](docs/configuration/environment-config.md) - Multi-environment setup
-- [Index Settings](docs/configuration/index-settings.md) - Index configuration
-- [Multi-Site](docs/configuration/multi-site.md) - Multi-site configuration
-
-### Usage
-- [Search Implementation](docs/usage/search-implementation.md) - Using search in templates
-- [AJAX Endpoints](docs/usage/ajax-endpoints.md) - AJAX search integration
-- [Frontend Examples](docs/usage/frontend-examples.md) - JavaScript examples
-- [Template Integration](docs/usage/template-integration.md) - Twig integration
-
-### Advanced
-- [Security Features](docs/advanced/security.md) - Security documentation
-- [Performance](docs/advanced/performance.md) - Performance optimization
-- [Troubleshooting](docs/advanced/troubleshooting.md) - Common issues and solutions
-- [Advanced Features](docs/advanced/advanced-features.md) - Advanced plugin features
-
-### Development
-- [Security API](docs/development/security-api.md) - Security services reference
-- [Services API](docs/development/services-api.md) - Service documentation
-- [Events](docs/development/events.md) - Event system
-- [Extending](docs/development/extending.md) - Plugin extension
+The documentation covers:
+- Installation and configuration
+- Template integration and usage
+- API reference and development
+- Examples and best practices
+- Troubleshooting and performance optimization
 
 ## Support
 
-- **Documentation**: [GitHub Repository](https://github.com/pennebaker/craft-searchwithelastic)
+- **Documentation**: [searchwithelastic.pennebaker.io](https://searchwithelastic.pennebaker.io)
+- **GitHub**: [Repository](https://github.com/pennebaker/craft-searchwithelastic)
 - **Issues**: [Report Issues](https://github.com/pennebaker/craft-searchwithelastic/issues)
-- **Support**: Contact [Pennebaker](https://www.pennebaker.com)
 
 ## License
 
@@ -173,4 +149,4 @@ This plugin is proprietary software developed by Pennebaker.
 
 ## Credits
 
-Created by [Pennebaker](https://www.pennebaker.com) - Experts in Craft CMS development and digital experiences.
+Created by [Pennebaker](https://www.pennebaker.com)
