@@ -49,19 +49,19 @@ class SearchVariable
     /**
      * Perform an advanced search with additional options like fuzzy matching and field selection
      *
-     * @param string $query The search query string
+     * @param string|null $query The search query string (null for aggregation-only queries)
      * @param array $options Search options (fuzzy, fields, siteId, size)
      * @return array Search results with formatted elements and highlighting
      * @throws SiteNotFoundException
      * @throws TooManyRequestsHttpException if rate limit exceeded
      * @since 4.0.0
      */
-    public function searchExtra(string $query, array $options = []): array
+    public function searchExtra(?string $query = null, array $options = []): array
     {
         // Apply rate limiting if enabled
         $this->checkRateLimit();
         
-        return SearchWithElastic::getInstance()->elasticsearch->advancedSearch($query, $options);
+        return SearchWithElastic::getInstance()->elasticsearch->advancedSearch($query ?? '', $options);
     }
 
     /**

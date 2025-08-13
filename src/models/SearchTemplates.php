@@ -315,7 +315,17 @@ class SearchTemplates extends Model
         return [
             'lang' => 'mustache',
             'source' => json_encode([
-                'size' => 0,
+                'size' => '{{#size}}{{size}}{{/size}}{{^size}}20{{/size}}',
+                '{{#query_text}}' => [
+                    'query' => [
+                        'multi_match' => [
+                            'query' => '{{query_text}}',
+                            'fields' => '{{#search_fields}}{{.}} {{/search_fields}}{{^search_fields}}title content{{/search_fields}}',
+                            'type' => 'best_fields'
+                        ]
+                    ]
+                ],
+                '{{/query_text}}' => null,
                 'aggs' => [
                     '{{#aggregations}}' => [
                         '{{name}}' => [
@@ -373,19 +383,16 @@ class SearchTemplates extends Model
             'lang' => 'mustache',
             'source' => json_encode([
                 'query' => [
-                    'bool' => [
-                        'should' => [
-                            '{{#search_fields}}' => [
-                                'match' => [
-                                    '{{.}}' => [
-                                        'query' => '{{query_text}}',
-                                        'boost' => '{{#field_boosts.}}{{.}}{{/field_boosts.}}{{^field_boosts.}}1{{/field_boosts.}}'
-                                    ]
-                                ]
-                            ],
-                            '{{/search_fields}}' => null
+                    'multi_match' => [
+                        'query' => '{{query_text}}',
+                        'fields' => [
+                            '{{#search_fields}}',
+                            '{{.}}^{{#field_boosts.}}{{.}}{{/field_boosts.}}{{^field_boosts.}}1{{/field_boosts.}}',
+                            '{{/search_fields}}'
                         ],
-                        'minimum_should_match' => 1
+                        'type' => 'best_fields',
+                        'operator' => 'or',
+                        'minimum_should_match' => '30%'
                     ]
                 ]
             ], JSON_THROW_ON_ERROR)

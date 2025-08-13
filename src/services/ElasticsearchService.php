@@ -23,6 +23,7 @@ use DateTime;
 use Exception;
 use pennebaker\searchwithelastic\events\connection\ConnectionTestEvent;
 use pennebaker\searchwithelastic\events\search\SearchEvent;
+use pennebaker\searchwithelastic\models\SearchTemplates;
 use pennebaker\searchwithelastic\SearchWithElastic;
 
 /**
@@ -274,18 +275,20 @@ class ElasticsearchService extends Component
      * Advanced search in Elasticsearch with fuzzy matching and field selection
      *
      * @param string $query The search query
-     * @param array<string, mixed> $options Search options including fuzzy, fields, siteId, size
+     * @param array<string, mixed> $options Search options including fuzzy, fields, siteId, size, useDirectQuery
      * @return array<string, mixed> The search results
      * @throws SiteNotFoundException
      * @since 4.0.0
      */
-    public function advancedSearch(string $query, array $options = []): array
+    public function advancedSearch(?string $query = null, array $options = []): array
     {
         // Parse options with defaults
         $siteId = $options['siteId'] ?? null;
         $fuzzy = $options['fuzzy'] ?? true;
         $fields = $options['fields'] ?? ['title', 'content'];
         $size = $options['size'] ?? 50;
+        $useDirectQuery = $options['useDirectQuery'] ?? false;
+        $searchType = $options['searchType'] ?? null;
 
         // Use current site if no site ID provided
         if ($siteId === null) {
@@ -327,9 +330,54 @@ class ElasticsearchService extends Component
             $fields = $searchParams['fields'] ?? $fields;
             $size = $searchParams['size'] ?? $size;
 
-            // Build query based on search type and query content
-            $queryBuilder = new ElasticsearchQueryBuilder();
-            $queryResult = $queryBuilder->buildSearchQuery($searchQuery, $fields, $fuzzy);
+            // Check if options contain a direct Elasticsearch query or if direct query mode is requested
+            if (isset($options['query']) || isset($options['aggs'])) {
+                // Use the direct query/aggregation from options
+                $queryResult = $options;
+                Craft::info("Using provided query/aggregation from options", __METHOD__);
+            } elseif ($searchType === 'aggregation' && isset($options['aggregations'])) {
+                // Use aggregation template for aggregation searches
+                $templateService = SearchWithElastic::getInstance()->searchTemplates;
+                $templateService->initializeTemplates();
+                
+                // Build params for aggregation template
+                $params = [
+                    'aggregations' => $options['aggregations'],
+                    'size' => $size
+                ];
+                
+                // Add query if provided
+                if (!empty($searchQuery)) {
+                    $params['query_text'] = $searchQuery;
+                    $params['search_fields'] = $options['search_fields'] ?? $fields;
+                }
+                
+                $queryResult = [
+                    'template_id' => SearchTemplates::TEMPLATE_AGGREGATION_SEARCH,
+                    'params' => $params
+                ];
+                Craft::info("Using aggregation template mode", __METHOD__);
+            } elseif ($useDirectQuery && $searchQuery) {
+                // Build a direct multi_match query for better scoring (bypassing templates)
+                $fieldsWithBoosts = $this->buildFieldsWithBoosts($fields);
+                $queryResult = [
+                    'query' => [
+                        'multi_match' => [
+                            'query' => $searchQuery,
+                            'fields' => $fieldsWithBoosts,
+                            'type' => 'best_fields',
+                            'operator' => 'or',
+                            'fuzziness' => $fuzzy ? 'AUTO' : '0'
+                        ]
+                    ]
+                ];
+                Craft::info("Using direct query mode with fields: " . json_encode($fieldsWithBoosts), __METHOD__);
+            } else {
+                // Build query using templates (default behavior)
+                $queryBuilder = new ElasticsearchQueryBuilder();
+                $queryResult = $queryBuilder->buildSearchQuery($searchQuery ?? '', $fields, $fuzzy);
+                Craft::info("Using template-based query mode", __METHOD__);
+            }
 
             // Get highlight settings from plugin configuration
             $settings = SearchWithElastic::getInstance()->getSettings();
@@ -371,13 +419,30 @@ class ElasticsearchService extends Component
             } else {
                 // Fallback to direct query (for match_all or backward compatibility)
                 // For Elasticsearch 7+, size and highlight are top-level parameters
-                $searchParams = [
-                    'index' => $indexName,
-                    'size' => $size,
-                    'body' => [
-                        'query' => $queryResult
-                    ]
-                ];
+                
+                // Check if queryResult already contains a complete body structure
+                if (isset($queryResult['query']) || isset($queryResult['aggs']) || isset($queryResult['post_filter'])) {
+                    // This is a complete Elasticsearch body with query/aggregations/post_filter
+                    // Move size to body for consistency
+                    $body = $queryResult;
+                    if (!isset($body['size'])) {
+                        $body['size'] = $size;
+                    }
+                    
+                    $searchParams = [
+                        'index' => $indexName,
+                        'body' => $body
+                    ];
+                } else {
+                    // This is just a query clause
+                    $searchParams = [
+                        'index' => $indexName,
+                        'size' => $size,
+                        'body' => [
+                            'query' => $queryResult
+                        ]
+                    ];
+                }
                 
                 // Add highlighting if configured - as a top-level parameter
                 if (!empty($settings->highlight['pre_tags']) || !empty($settings->highlight['post_tags'])) {
@@ -399,6 +464,37 @@ class ElasticsearchService extends Component
                 // Use direct service to bypass Yii2 Elasticsearch library issues
                 $response = ElasticsearchDirectService::search($searchParams);
             }
+            
+            // Check if we need to return the full response structure
+            // This includes queries with aggregations, post_filter, or size: 0
+            $hasAggregations = isset($options['aggs']) || isset($options['aggregations']);
+            $hasPostFilter = isset($options['post_filter']);
+            $isAggregationOnly = isset($options['size']) && $options['size'] === 0;
+            
+            // Always return full structure when aggregations are requested
+            if ($hasAggregations || $hasPostFilter || $isAggregationOnly) {
+                // Log what we're returning
+                Craft::info("Returning full response structure with aggregations", __METHOD__);
+                Craft::info("Has aggregations in response: " . (isset($response['aggregations']) ? 'yes' : 'no'), __METHOD__);
+                
+                // For aggregation queries, return the full response with aggregations
+                // This allows templates to access response.aggregations
+                $result = [
+                    'hits' => $response['hits']['hits'] ?? [],
+                    'total' => $response['hits']['total'] ?? 0,
+                    'aggregations' => $response['aggregations'] ?? []
+                ];
+                
+                // Fire an 'afterSearch' event
+                if ($this->hasEventHandlers(self::EVENT_AFTER_SEARCH)) {
+                    $event->params['results'] = $result;
+                    $this->trigger(self::EVENT_AFTER_SEARCH, $event);
+                }
+                
+                return $result;
+            }
+            
+            // For regular search queries, return just the hits array
             $hits = $response['hits']['hits'] ?? [];
 
             Craft::info("Search returned " . count($hits) . " results", __METHOD__);
@@ -861,6 +957,34 @@ class ElasticsearchService extends Component
                 // Default to including all elements
                 return true;
         }
+    }
+
+    /**
+     * Build fields array with boost values for Elasticsearch multi_match query
+     *
+     * @param array $fields Array of field names or field names with boost values
+     * @return array Array of fields with boost values in Elasticsearch format
+     * @since 4.0.0
+     */
+    private function buildFieldsWithBoosts(array $fields): array
+    {
+        $fieldsWithBoosts = [];
+        
+        foreach ($fields as $key => $value) {
+            if (is_string($key)) {
+                // Associative array with field => boost
+                $fieldsWithBoosts[] = $key . '^' . $value;
+            } elseif (is_string($value)) {
+                // Simple field name - check for default boosts
+                if ($value === 'title') {
+                    $fieldsWithBoosts[] = 'title^2';
+                } else {
+                    $fieldsWithBoosts[] = $value;
+                }
+            }
+        }
+        
+        return $fieldsWithBoosts;
     }
 
 }
