@@ -27,7 +27,9 @@ use craft\events\PluginEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\helpers\App;
 use craft\helpers\ArrayHelper;
+use craft\helpers\ElementHelper;
 use craft\i18n\Locale;
 use craft\models\Section;
 use craft\queue\Queue;
@@ -373,7 +375,7 @@ class SearchWithElastic extends Plugin
      * @throws InvalidConfigException If the configuration passed to the yii2-elasticsearch module is invalid
      * @since 4.0.0
      */
-    public function initializeElasticConnector(SettingsModel $settings = null): void
+    public function initializeElasticConnector(?SettingsModel $settings = null): void
     {
         if ($settings === null) {
             $settings = $this->getSettings();
@@ -382,7 +384,8 @@ class SearchWithElastic extends Plugin
         if ($settings->elasticsearchComponentConfig !== null) {
             $definition = $settings->elasticsearchComponentConfig;
         } else {
-            $endpoint = $settings->elasticsearchEndpoint;
+            // Parse environment variables in the endpoint
+            $endpoint = App::parseEnv($settings->elasticsearchEndpoint);
 
             // Check if endpoint already has a protocol
             if (preg_match('#^https?://#i', $endpoint)) {
@@ -408,8 +411,8 @@ class SearchWithElastic extends Plugin
 
             if ($settings->isAuthEnabled) {
                 $definition['auth'] = [
-                    'username' => $settings->username,
-                    'password' => $settings->password,
+                    'username' => App::parseEnv($settings->username),
+                    'password' => App::parseEnv($settings->password),
                 ];
             }
         }

@@ -19,6 +19,7 @@ use craft\digitalproducts\elements\Product as DigitalProduct;
 use craft\elements\Asset;
 use craft\elements\Category;
 use craft\elements\Entry;
+use craft\helpers\App;
 use Exception;
 use pennebaker\searchwithelastic\helpers\validation\ValidationHelper;
 use pennebaker\searchwithelastic\SearchWithElastic;
@@ -59,7 +60,7 @@ class SettingsModel extends Model
         ];
     }
 
-    /** @var string The Elasticsearch instance endpoint URL (with protocol, host and port) */
+    /** @var string The Elasticsearch instance endpoint - accepts full URL (https://host:port) or hostname:port format */
     public string $elasticsearchEndpoint = 'elasticsearch:9200';
 
     /** @var bool A boolean indicating whether authentication to the Elasticsearch server is required */
@@ -223,7 +224,7 @@ class SettingsModel extends Model
         return [
             ['elasticsearchEndpoint', 'required', 'message' => Craft::t(SearchWithElastic::PLUGIN_HANDLE, 'Endpoint URL is required')],
             ['elasticsearchEndpoint', 'string'],
-            ['elasticsearchEndpoint', 'match', 'pattern' => '/^(https?:\/\/)?[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}(:[0-9]+)?(\/.*)?$|^[a-zA-Z0-9\-\.]+:[0-9]+$/', 'message' => 'Please enter a valid Elasticsearch endpoint URL or hostname:port'],
+            ['elasticsearchEndpoint', 'validateElasticsearchEndpoint'],
             ['elasticsearchEndpoint', 'default', 'value' => 'elasticsearch:9200'],
             ['isAuthEnabled', 'boolean'],
             [['username', 'password'], 'string'],
@@ -315,6 +316,50 @@ class SettingsModel extends Model
     }
 
     /**
+     * Validates the Elasticsearch endpoint format
+     *
+     * Accepts both full URLs (http://host:port, https://host:port) and
+     * traditional hostname:port format for backward compatibility.
+     *
+     * @param string $attribute The attribute being validated
+     * @return void
+     */
+    public function validateElasticsearchEndpoint(string $attribute): void
+    {
+        // Parse environment variables first
+        $value = App::parseEnv($this->$attribute);
+
+        if (empty($value)) {
+            return; // Required validation will handle empty values
+        }
+
+        // Check if it's a full URL with protocol
+        if (preg_match('#^https?://#i', $value)) {
+            // Parse the URL to validate its components
+            $parsed = parse_url($value);
+
+            if (!$parsed || !isset($parsed['host'])) {
+                $this->addError($attribute, Craft::t(
+                    SearchWithElastic::PLUGIN_HANDLE,
+                    'Invalid URL format. Please enter a valid Elasticsearch endpoint (e.g., https://elasticsearch:9200)'
+                ));
+                return;
+            }
+
+            // Port is optional in URL format (defaults to 80/443)
+            return;
+        }
+
+        // For hostname:port format, port is required
+        if (!preg_match('/^[a-zA-Z0-9\-._]+:\d+$/', $value)) {
+            $this->addError($attribute, Craft::t(
+                SearchWithElastic::PLUGIN_HANDLE,
+                'Please enter a valid Elasticsearch endpoint. Use either a full URL (https://elasticsearch:9200) or hostname:port format (elasticsearch:9200)'
+            ));
+        }
+    }
+
+    /**
      * Validates the index prefix using Elasticsearch naming rules
      *
      * @param string $attribute The attribute being validated
@@ -323,12 +368,12 @@ class SettingsModel extends Model
     public function validateIndexPrefix(string $attribute): void
     {
         $value = $this->$attribute;
-        
+
         // Empty prefix is allowed
         if ($value === '') {
             return;
         }
-        
+
         $errors = IndexValidator::validateIndexName($value);
         foreach ($errors as $error) {
             $this->addError($attribute, $error);
@@ -344,7 +389,7 @@ class SettingsModel extends Model
     public function validateFallbackIndexName(string $attribute): void
     {
         $value = $this->$attribute;
-        
+
         $errors = IndexValidator::validateIndexName($value);
         foreach ($errors as $error) {
             $this->addError($attribute, $error);
@@ -426,12 +471,13 @@ class SettingsModel extends Model
                 throw new InvalidConfigException('Could not connect to the Elasticsearch server.');
             }
         } catch (InvalidConfigException) {
+            $parsedEndpoint = App::parseEnv($this->elasticsearchEndpoint);
             $this->addError(
                 'global',
                 Craft::t(
                     SearchWithElastic::PLUGIN_HANDLE,
                     'Could not connect to the Elasticsearch instance at {elasticsearchEndpoint}. Please check the endpoint URL and authentication settings.',
-                    ['elasticsearchEndpoint' => $this->elasticsearchEndpoint]
+                    ['elasticsearchEndpoint' => $parsedEndpoint]
                 )
             );
         } finally {
