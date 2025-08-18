@@ -29,6 +29,59 @@ use yii\base\InvalidConfigException;
 class ElasticsearchHelper
 {
     /**
+     * Text field with keyword multi-field mapping constant
+     * Allows both full-text search and exact matching/aggregations
+     * 
+     * @since 4.0.0
+     */
+    public const TEXT_WITH_KEYWORD_MAPPING = [
+        'type' => 'text',
+        'fields' => [
+            'keyword' => [
+                'type' => 'keyword',
+                'ignore_above' => 256
+            ]
+        ]
+    ];
+
+    /**
+     * Date field mapping constant
+     * @since 4.0.0
+     */
+    public const DATE_FIELD_MAPPING = [
+        'type'   => 'date',
+        'format' => 'yyyy-MM-dd HH:mm:ss',
+        'store'  => true,
+    ];
+
+    /**
+     * Boolean field mapping constant
+     * @since 4.0.0
+     */
+    public const BOOLEAN_FIELD_MAPPING = [
+        'type'  => 'boolean',
+        'store' => true,
+    ];
+
+    /**
+     * Stored text field mapping constant
+     * @since 4.0.0
+     */
+    public const STORED_TEXT_FIELD_MAPPING = [
+        'type'  => 'text',
+        'store' => true,
+    ];
+
+    /**
+     * Keyword field mapping constant
+     * @since 4.0.0
+     */
+    public const KEYWORD_FIELD_MAPPING = [
+        'type'  => 'keyword',
+        'store' => true,
+    ];
+
+    /**
      * Get the mapping of language codes to Elasticsearch analyzers
      *
      * @return array<string, string> Language code => analyzer name mapping
@@ -161,34 +214,6 @@ class ElasticsearchHelper
         ];
     }
 
-    /**
-     * Create a date field mapping
-     *
-     * @return array The date field mapping configuration
-     * @since 4.0.0
-     */
-    public static function createDateFieldMapping(): array
-    {
-        return [
-            'type'   => 'date',
-            'format' => 'yyyy-MM-dd HH:mm:ss',
-            'store'  => true,
-        ];
-    }
-
-    /**
-     * Create a boolean field mapping
-     *
-     * @return array The boolean field mapping configuration
-     * @since 4.0.0
-     */
-    public static function createBooleanFieldMapping(): array
-    {
-        return [
-            'type'  => 'boolean',
-            'store' => true,
-        ];
-    }
 
     /**
      * Create a text field mapping with analyzer
@@ -206,33 +231,7 @@ class ElasticsearchHelper
         ];
     }
 
-    /**
-     * Create a simple stored text field mapping
-     *
-     * @return array The text field mapping configuration
-     * @since 4.0.0
-     */
-    public static function createStoredTextFieldMapping(): array
-    {
-        return [
-            'type'  => 'text',
-            'store' => true,
-        ];
-    }
 
-    /**
-     * Create a keyword field mapping
-     *
-     * @return array The keyword field mapping configuration
-     * @since 4.0.0
-     */
-    public static function createKeywordFieldMapping(): array
-    {
-        return [
-            'type'  => 'keyword',
-            'store' => true,
-        ];
-    }
 
     /**
      * Create the attachment property mapping
@@ -261,7 +260,7 @@ class ElasticsearchHelper
     public static function createOrderField(?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) {
                 return Entry::find()->positionedBefore($element)->count();
@@ -280,7 +279,7 @@ class ElasticsearchHelper
     public static function createFieldValueAccessor(string $fieldName, ?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
                 return Craft::$app->entries->getEntryById($element->id)?->$fieldName;
@@ -299,7 +298,7 @@ class ElasticsearchHelper
     public static function createFieldValueProperty(string $fieldName, ?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
                 $entry = Craft::$app->entries->getEntryById($element->id);
@@ -319,7 +318,7 @@ class ElasticsearchHelper
     public static function createFieldHandleAccessor(string $fieldName, ?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
                 $entry = Craft::$app->entries->getEntryById($element->id);
@@ -339,7 +338,7 @@ class ElasticsearchHelper
     public static function createRelationTitlesField(string $fieldName, ?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
                 if (!isset($element->$fieldName)) {
@@ -394,7 +393,7 @@ class ElasticsearchHelper
         }
 
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName, $limitYear) {
                 $year = $element->$fieldName ? (int)$element->$fieldName->format('Y') : null;
@@ -420,6 +419,11 @@ class ElasticsearchHelper
      */
     public static function createImageField(string $fieldName, array $subFields = [], ?array $mapping = null): array
     {
+        // Default to 'nested' type if no mapping is provided to handle arrays of objects properly
+        if ($mapping === null) {
+            $mapping = ['type' => 'nested'];
+        }
+        
         return [
             'mapping' => $mapping,
             'highlighter' => (object)[],
@@ -472,6 +476,11 @@ class ElasticsearchHelper
      */
     public static function createAssetField(string $fieldName, ?array $mapping = null): array
     {
+        // Default to 'nested' type if no mapping is provided to handle arrays of objects properly
+        if ($mapping === null) {
+            $mapping = ['type' => 'nested'];
+        }
+        
         return [
             'mapping' => $mapping,
             'highlighter' => (object)[],
@@ -509,7 +518,7 @@ class ElasticsearchHelper
     public static function createCategoryParentField(string $fieldName, ?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
                 if (!isset($element->$fieldName)) {
@@ -548,7 +557,7 @@ class ElasticsearchHelper
     public static function createCategoryChildField(string $fieldName, ?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
                 if (!isset($element->$fieldName)) {
@@ -581,7 +590,7 @@ class ElasticsearchHelper
     public static function createTypeNameField(?array $mapping = null): array
     {
         return [
-            'mapping' => $mapping ?? self::createKeywordFieldMapping(),
+            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) {
                 $entry = Craft::$app->entries->getEntryById($element->id);
