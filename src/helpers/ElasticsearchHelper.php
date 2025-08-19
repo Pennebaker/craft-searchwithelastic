@@ -282,7 +282,74 @@ class ElasticsearchHelper
             'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
             'highlighter' => (object)[],
             'value' => function (ElementInterface $element) use ($fieldName) {
-                return Craft::$app->entries->getEntryById($element->id)?->$fieldName;
+                $entry = Craft::$app->entries->getEntryById($element->id);
+                if (!$entry || !isset($entry->$fieldName)) {
+                    return null;
+                }
+                
+                $fieldValue = $entry->$fieldName;
+                
+                // Handle null values
+                if ($fieldValue === null) {
+                    return null;
+                }
+                
+                // If it's an object with common field properties, extract the appropriate value
+                if (is_object($fieldValue)) {
+                    // Check for common Craft field value properties
+                    if (isset($fieldValue->value)) {
+                        return $fieldValue->value;
+                    }
+                    if (isset($fieldValue->handle)) {
+                        return $fieldValue->handle;
+                    }
+                    if (isset($fieldValue->label)) {
+                        return $fieldValue->label;
+                    }
+                    if (isset($fieldValue->title)) {
+                        return $fieldValue->title;
+                    }
+                    if (isset($fieldValue->name)) {
+                        return $fieldValue->name;
+                    }
+                    
+                    // If it's a query, get the IDs
+                    if ($fieldValue instanceof \craft\elements\db\ElementQuery) {
+                        return $fieldValue->ids();
+                    }
+                    
+                    // If we can't extract a simple value, convert to string
+                    if (method_exists($fieldValue, '__toString')) {
+                        return (string)$fieldValue;
+                    }
+                    
+                    // Last resort - return null to avoid indexing errors
+                    return null;
+                }
+                
+                // If it's an array, check if it contains objects and extract values
+                if (is_array($fieldValue)) {
+                    $values = [];
+                    foreach ($fieldValue as $item) {
+                        if (is_object($item)) {
+                            if (isset($item->value)) {
+                                $values[] = $item->value;
+                            } elseif (isset($item->handle)) {
+                                $values[] = $item->handle;
+                            } elseif (isset($item->label)) {
+                                $values[] = $item->label;
+                            } elseif (method_exists($item, '__toString')) {
+                                $values[] = (string)$item;
+                            }
+                        } else {
+                            $values[] = $item;
+                        }
+                    }
+                    return $values;
+                }
+                
+                // For scalar values, return as-is
+                return $fieldValue;
             }
         ];
     }
