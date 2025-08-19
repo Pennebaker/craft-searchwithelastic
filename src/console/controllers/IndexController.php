@@ -11,6 +11,7 @@
 
 namespace pennebaker\searchwithelastic\console\controllers;
 
+use Craft;
 use Exception;
 use pennebaker\searchwithelastic\models\IndexableElementModel;
 use pennebaker\searchwithelastic\queries\IndexableAssetQuery;
@@ -34,6 +35,58 @@ use yii\helpers\Console;
  */
 class IndexController extends Controller
 {
+    /**
+     * @var string The reindex mode to use
+     * Options: reset (default), all, missing, updated, missing-updated
+     */
+    public $mode = 'reset';
+
+    /**
+     * @inheritdoc
+     */
+    public function options($actionID): array
+    {
+        $options = parent::options($actionID);
+        
+        // Add --mode option to all reindex actions
+        if (strpos($actionID, 'reindex') === 0) {
+            $options[] = 'mode';
+        }
+        
+        return $options;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function optionAliases(): array
+    {
+        return array_merge(parent::optionAliases(), [
+            'm' => 'mode',
+        ]);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        // Validate mode option for reindex actions
+        if (strpos($action->id, 'reindex') === 0) {
+            $validModes = ['reset', 'all', 'missing', 'updated', 'missing-updated'];
+            if (!in_array($this->mode, $validModes, true)) {
+                $this->stderr("Invalid mode: {$this->mode}" . PHP_EOL, Console::FG_RED);
+                $this->stderr("Valid modes: " . implode(', ', $validModes) . PHP_EOL);
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     /**
      * Reindex all element types (entries, assets, categories, products & digital products) in Elasticsearch
@@ -43,7 +96,14 @@ class IndexController extends Controller
      */
     public function actionReindexAll(): int
     {
-        $indexableElementModels = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels();
+        // Handle reset mode - recreate indexes first
+        if ($this->mode === 'reset') {
+            $this->stdout("Recreating indexes..." . PHP_EOL, Console::FG_YELLOW);
+            SearchWithElastic::getInstance()->indexManagement->recreateIndexesForAllSites();
+            $this->stdout("Indexes recreated." . PHP_EOL, Console::FG_GREEN);
+        }
+
+        $indexableElementModels = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels([], [], $this->mode);
 
         return $this->reindexElements($indexableElementModels, 'everything');
     }
@@ -56,7 +116,19 @@ class IndexController extends Controller
      */
     public function actionReindexEntries(): int
     {
-        $elementDescriptors = IndexableEntryQuery::find()->modelsForSites();
+        // Handle reset mode - recreate indexes first
+        if ($this->mode === 'reset') {
+            $this->stdout("Recreating indexes..." . PHP_EOL, Console::FG_YELLOW);
+            SearchWithElastic::getInstance()->indexManagement->recreateIndexesForAllSites();
+            $this->stdout("Indexes recreated." . PHP_EOL, Console::FG_GREEN);
+        }
+
+        // Get site IDs based on mode requirements
+        $siteIds = Craft::$app->getSites()->getAllSiteIds();
+        $elementTypes = [\craft\elements\Entry::class];
+        
+        // Use the main elasticsearch service to get models with mode filtering
+        $elementDescriptors = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels($siteIds, $elementTypes, $this->mode);
 
         return $this->reindexElements($elementDescriptors, 'entries');
     }
@@ -69,7 +141,19 @@ class IndexController extends Controller
      */
     public function actionReindexAssets(): int
     {
-        $elementDescriptors = IndexableAssetQuery::find()->modelsForSites();
+        // Handle reset mode - recreate indexes first
+        if ($this->mode === 'reset') {
+            $this->stdout("Recreating indexes..." . PHP_EOL, Console::FG_YELLOW);
+            SearchWithElastic::getInstance()->indexManagement->recreateIndexesForAllSites();
+            $this->stdout("Indexes recreated." . PHP_EOL, Console::FG_GREEN);
+        }
+
+        // Get site IDs based on mode requirements
+        $siteIds = Craft::$app->getSites()->getAllSiteIds();
+        $elementTypes = [\craft\elements\Asset::class];
+        
+        // Use the main elasticsearch service to get models with mode filtering
+        $elementDescriptors = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels($siteIds, $elementTypes, $this->mode);
 
         return $this->reindexElements($elementDescriptors, 'assets');
     }
@@ -82,7 +166,19 @@ class IndexController extends Controller
      */
     public function actionReindexCategories(): int
     {
-        $elementDescriptors = IndexableCategoryQuery::find()->modelsForSites();
+        // Handle reset mode - recreate indexes first
+        if ($this->mode === 'reset') {
+            $this->stdout("Recreating indexes..." . PHP_EOL, Console::FG_YELLOW);
+            SearchWithElastic::getInstance()->indexManagement->recreateIndexesForAllSites();
+            $this->stdout("Indexes recreated." . PHP_EOL, Console::FG_GREEN);
+        }
+
+        // Get site IDs based on mode requirements
+        $siteIds = Craft::$app->getSites()->getAllSiteIds();
+        $elementTypes = [\craft\elements\Category::class];
+        
+        // Use the main elasticsearch service to get models with mode filtering
+        $elementDescriptors = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels($siteIds, $elementTypes, $this->mode);
 
         return $this->reindexElements($elementDescriptors, 'categories');
     }
@@ -95,7 +191,19 @@ class IndexController extends Controller
      */
     public function actionReindexProducts(): int
     {
-        $elementDescriptors = IndexableProductQuery::find()->modelsForSites();
+        // Handle reset mode - recreate indexes first
+        if ($this->mode === 'reset') {
+            $this->stdout("Recreating indexes..." . PHP_EOL, Console::FG_YELLOW);
+            SearchWithElastic::getInstance()->indexManagement->recreateIndexesForAllSites();
+            $this->stdout("Indexes recreated." . PHP_EOL, Console::FG_GREEN);
+        }
+
+        // Get site IDs based on mode requirements
+        $siteIds = Craft::$app->getSites()->getAllSiteIds();
+        $elementTypes = [\craft\commerce\elements\Product::class];
+        
+        // Use the main elasticsearch service to get models with mode filtering
+        $elementDescriptors = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels($siteIds, $elementTypes, $this->mode);
 
         return $this->reindexElements($elementDescriptors, 'products');
     }
@@ -108,7 +216,19 @@ class IndexController extends Controller
      */
     public function actionReindexDigitalProducts(): int
     {
-        $elementDescriptors = IndexableDigitalProductQuery::find()->modelsForSites();
+        // Handle reset mode - recreate indexes first
+        if ($this->mode === 'reset') {
+            $this->stdout("Recreating indexes..." . PHP_EOL, Console::FG_YELLOW);
+            SearchWithElastic::getInstance()->indexManagement->recreateIndexesForAllSites();
+            $this->stdout("Indexes recreated." . PHP_EOL, Console::FG_GREEN);
+        }
+
+        // Get site IDs based on mode requirements
+        $siteIds = Craft::$app->getSites()->getAllSiteIds();
+        $elementTypes = [\craft\digitalproducts\elements\Product::class];
+        
+        // Use the main elasticsearch service to get models with mode filtering
+        $elementDescriptors = SearchWithElastic::getInstance()->elasticsearch->getIndexableElementModels($siteIds, $elementTypes, $this->mode);
 
         return $this->reindexElements($elementDescriptors, 'digitalProducts');
     }
@@ -175,8 +295,18 @@ class IndexController extends Controller
         $warningCount = 0;
         $skippedCount = 0;
 
+        // Display mode information
+        $modeDescriptions = [
+            'reset' => 'Reset & Index (recreating indexes)',
+            'all' => 'All elements',
+            'missing' => 'Missing elements only',
+            'updated' => 'Updated elements only',
+            'missing-updated' => 'Missing & Updated elements'
+        ];
+        $modeDesc = $modeDescriptions[$this->mode] ?? $this->mode;
+
         // Display initial message matching Craft's style
-        $this->stdout("Reindexing $elementCount $type ..." . PHP_EOL, Console::FG_YELLOW);
+        $this->stdout("Reindexing $elementCount $type (Mode: $modeDesc) ..." . PHP_EOL, Console::FG_YELLOW);
 
         foreach ($indexableElementModels as $indexableElementModel) {
             $processedElementCount++;
