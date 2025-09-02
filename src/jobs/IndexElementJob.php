@@ -13,6 +13,7 @@ namespace pennebaker\searchwithelastic\jobs;
 
 use Craft;
 use craft\base\ElementInterface;
+use craft\helpers\ElementHelper;
 use craft\queue\BaseJob;
 use pennebaker\searchwithelastic\exceptions\IndexableElementModelException;
 use pennebaker\searchwithelastic\models\IndexableElementModel;
@@ -70,7 +71,16 @@ class IndexElementJob extends BaseJob
         $model->elementId = $this->elementId;
         $model->siteId = $this->siteId;
         $model->type = $this->elementType;
-        SearchWithElastic::getInstance()->elementIndexer->indexElement($model->getElement());
+        
+        $element = $model->getElement();
+        
+        // Skip if element is a draft or revision
+        if (ElementHelper::isDraftOrRevision($element)) {
+            Craft::info("Skipping draft/revision element #{$this->elementId} in site #{$this->siteId}", 'search-with-elastic');
+            return;
+        }
+        
+        SearchWithElastic::getInstance()->elementIndexer->indexElement($element);
     }
 
     /**

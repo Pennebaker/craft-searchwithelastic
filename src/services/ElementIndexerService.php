@@ -20,6 +20,7 @@ use craft\elements\Asset;
 use craft\elements\Category;
 use craft\elements\Entry;
 use craft\helpers\ArrayHelper;
+use craft\helpers\ElementHelper;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use pennebaker\searchwithelastic\events\indexing\ContentExtractionEvent;
@@ -246,9 +247,14 @@ class ElementIndexerService extends Component
      */
     protected function getSkipReason(Element $element): string
     {
+        // Check if it's a draft or revision first
+        if (ElementHelper::isDraftOrRevision($element)) {
+            return 'Element is a draft or revision';
+        }
+
         $settings = SearchWithElastic::getInstance()->getSettings();
 
-        // Check URL requirement first
+        // Check URL requirement
         if (!$settings->indexElementsWithoutUrls && !$element->getUrl()) {
             return 'Element has no URL and URL indexing is required';
         }
@@ -335,6 +341,11 @@ class ElementIndexerService extends Component
      */
     protected function shouldIndexElement(Element $element): bool
     {
+        // Skip drafts and revisions
+        if (ElementHelper::isDraftOrRevision($element)) {
+            return false;
+        }
+
         $settings = SearchWithElastic::getInstance()->getSettings();
 
         // Check if element has no URL and that's not allowed

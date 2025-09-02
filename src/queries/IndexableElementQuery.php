@@ -63,6 +63,11 @@ abstract class IndexableElementQuery
         $elementType = static::elementType();
         $query = new static();
         $query->elementQuery = $elementType::find();
+        
+        // Always exclude drafts and revisions from indexing
+        $query->elementQuery->drafts(false);
+        $query->elementQuery->revisions(false);
+        
         $query->applyDefaultFilters();
         return $query;
     }
