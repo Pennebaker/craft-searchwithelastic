@@ -119,6 +119,15 @@ class SettingsModel extends Model
 
     /** @var bool A boolean indicating whether frontend content fetching via HTTP requests is enabled */
     public bool $enableFrontendFetching = true;
+    
+    /** @var bool A boolean indicating whether to use CraftCMS searchable fields for indexing */
+    public bool $useSearchableFields = false;
+    
+    /** @var bool A boolean indicating whether to fallback to frontend fetching if searchable fields extraction fails */
+    public bool $fallbackToFrontendFetching = true;
+    
+    /** @var bool A boolean indicating whether to include non-searchable fields in the index */
+    public bool $includeNonSearchableFields = false;
 
     /** @var array A list of handles of entry types that should not use frontend content fetching */
     public array $excludedFrontendFetchingEntryTypes = [];
@@ -238,6 +247,9 @@ class SettingsModel extends Model
             ['enableFrontendFetching', 'boolean'],
             ['enableFrontendFetchDebug', 'boolean'],
             ['indexElementsWithoutUrls', 'boolean'],
+            ['useSearchableFields', 'boolean'],
+            ['fallbackToFrontendFetching', 'boolean'],
+            ['includeNonSearchableFields', 'boolean'],
             [['excludedFrontendFetchingEntryTypes', 'excludedFrontendFetchingAssetVolumes', 'excludedFrontendFetchingCategoryGroups', 'excludedFrontendFetchingProductTypes', 'excludedFrontendFetchingDigitalProductTypes'], 'safe'],
             [['assetKinds', 'frontendFetchingAssetKinds'], 'safe'],
             ['indexPrefix', 'string'],

@@ -418,8 +418,50 @@ class ElementIndexerService extends Component
         // Add extra fields from plugin settings
         $this->addExtraFields($element, $document);
 
-        // Add content if frontend fetching is enabled
-        $fetchResult = $this->addElementContent($element, $document);
+        $settings = SearchWithElastic::getInstance()->getSettings();
+        $fetchResult = ['attempted' => false, 'success' => false, 'debugInfo' => []];
+
+        // Try searchable fields extraction first if enabled
+        if ($settings->useSearchableFields) {
+            try {
+                $searchableFieldsData = SearchWithElastic::getInstance()->searchableFieldsIndexer->extractSearchableFields(
+                    $element,
+                    ['includeNonSearchable' => $settings->includeNonSearchableFields]
+                );
+                
+                if (!empty($searchableFieldsData)) {
+                    $document['searchableFields'] = $searchableFieldsData;
+                    
+                    // Aggregate all keywords for main content field
+                    $allKeywords = [];
+                    foreach ($searchableFieldsData as $fieldData) {
+                        if (isset($fieldData['keywords']) && $fieldData['keywords'] !== '') {
+                            $allKeywords[] = $fieldData['keywords'];
+                        }
+                    }
+                    if (!empty($allKeywords)) {
+                        $document['content'] = implode(' ', $allKeywords);
+                    }
+                    
+                    $fetchResult['attempted'] = true;
+                    $fetchResult['success'] = true;
+                    $fetchResult['debugInfo']['method'] = 'searchableFields';
+                } elseif ($settings->fallbackToFrontendFetching) {
+                    // Fallback to frontend fetching if searchable fields extraction yielded no data
+                    $fetchResult = $this->addElementContent($element, $document);
+                }
+            } catch (\Exception $e) {
+                Craft::warning("Searchable fields extraction failed for element {$element->id}: " . $e->getMessage(), __METHOD__);
+                
+                if ($settings->fallbackToFrontendFetching) {
+                    // Fallback to frontend fetching on error
+                    $fetchResult = $this->addElementContent($element, $document);
+                }
+            }
+        } else {
+            // Use frontend fetching if searchable fields are disabled
+            $fetchResult = $this->addElementContent($element, $document);
+        }
 
         return [
             'document' => $document,

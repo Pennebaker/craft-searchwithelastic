@@ -54,6 +54,7 @@ use pennebaker\searchwithelastic\services\QueryService;
 use pennebaker\searchwithelastic\services\RateLimiterService;
 use pennebaker\searchwithelastic\services\RecordService;
 use pennebaker\searchwithelastic\services\ReindexQueueManagementService;
+use pennebaker\searchwithelastic\services\SearchableFieldsIndexer;
 use pennebaker\searchwithelastic\services\SearchTemplateService;
 use pennebaker\searchwithelastic\utilities\RefreshIndexUtility;
 use pennebaker\searchwithelastic\variables\SearchVariable;
@@ -83,6 +84,7 @@ use yii\queue\ExecEvent;
  * @property  services\RateLimiterService rateLimiter
  * @property  services\SearchTemplateService searchTemplates
  * @property  services\CallbackValidator callbackValidator
+ * @property  services\SearchableFieldsIndexer searchableFieldsIndexer
  * @property  SettingsModel settings
  * @property-read array $textBasedAssetKinds
  * @property-read array $allAssetKinds
@@ -129,6 +131,7 @@ class SearchWithElastic extends Plugin
                 'rateLimiter'                   => RateLimiterService::class,
                 'searchTemplates'               => SearchTemplateService::class,
                 'callbackValidator'             => CallbackValidator::class,
+                'searchableFieldsIndexer'       => SearchableFieldsIndexer::class,
             ]
         );
 
