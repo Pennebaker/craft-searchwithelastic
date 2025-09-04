@@ -588,14 +588,7 @@ class SearchWithElastic extends Plugin
         /** @var Element $element */
         $element = $event->sender;
 
-        // Handle drafts and revisions for Craft 3.2 and upper
-        $notDraftOrRevision = true;
-        $schemaVersion = Craft::$app->installedSchemaVersion;
-        if (version_compare($schemaVersion, '3.2.0', '>=')) {
-            $notDraftOrRevision = !ElementHelper::isDraftOrRevision($element);
-        }
-
-        if ($notDraftOrRevision) {
+        if (!ElementHelper::isDraftOrRevision($element)) {
             if ($element->enabled) {
                 $this->reindexQueueManagement->enqueueJob($element->id, $element->siteId, get_class($element));
             } else {
