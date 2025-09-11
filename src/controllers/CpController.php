@@ -205,9 +205,22 @@ class CpController extends Controller
 
             // Determine result type and format appropriate response
             if (str_starts_with($result['reason'] ?? $result, 'Failed to index element:') || str_starts_with($result['reason'] ?? $result, 'Element not found')) {
+                // Extract detailed error information if available
+                $errorMessage = is_array($result) ? $result['reason'] : $result;
+                $errorDetails = '';
+                
+                // If there's additional error information, include it
+                if (is_array($result) && isset($result['errorDetails'])) {
+                    $errorDetails = $result['errorDetails'];
+                }
+                
+                // Log the full error for debugging
+                Craft::error("Indexing failed for element $elementId: $errorMessage" . ($errorDetails ? " Details: $errorDetails" : ''), __METHOD__);
+                
                 return $this->asJson([
                     'success' => false,
-                    'error' => is_array($result) ? $result['reason'] : $result,
+                    'error' => $errorMessage,
+                    'errorDetails' => $errorDetails,
                     'elementId' => $elementId,
                     'elementType' => $this->getElementTypeName($elementType),
                 ]);
@@ -790,14 +803,45 @@ class CpController extends Controller
         $model->elementId = $elementId;
         $model->siteId = $siteId;
         $model->type = $elementType;
-        $element = $model->getElement();
+        
+        try {
+            $element = $model->getElement();
+        } catch (\Exception $e) {
+            Craft::error("Failed to get element {$elementId}: " . $e->getMessage(), __METHOD__);
+            return [
+                'status' => 'failed',
+                'reason' => 'Element not found: ' . $e->getMessage(),
+                'errorDetails' => 'Could not load element ID ' . $elementId . ' in site ' . $siteId
+            ];
+        }
+        
+        if (!$element) {
+            Craft::error("Element {$elementId} not found in site {$siteId}", __METHOD__);
+            return [
+                'status' => 'failed',
+                'reason' => 'Element not found',
+                'errorDetails' => 'Element ID ' . $elementId . ' does not exist in site ' . $siteId
+            ];
+        }
 
         try {
             $SearchWithElastic = SearchWithElastic::getInstance();
             if (!$SearchWithElastic) {
                 return 'Failed to index element: SearchWithElastic instance not found.';
             }
-            $result = $SearchWithElastic->elementIndexer->indexElement($element);
+            try {
+                $result = $SearchWithElastic->elementIndexer->indexElement($element);
+            } catch (\Exception $e) {
+                // Log the full exception for debugging
+                Craft::error("Exception during indexing of element {$element->id}: " . $e->getMessage() . "\nTrace: " . $e->getTraceAsString(), __METHOD__);
+                
+                // Return detailed error information
+                return [
+                    'status' => 'failed',
+                    'reason' => 'Failed to index element: ' . $e->getMessage(),
+                    'errorDetails' => $e->getMessage()
+                ];
+            }
 
             // Process indexing result and format appropriate response
             if ($result->isSuccess()) {
@@ -827,6 +871,15 @@ class CpController extends Controller
 
             if ($result->isSkipped() || $result->isDisabled()) {
                 return $result->reason; // Element was skipped
+            }
+
+            // For failed results, return detailed error information
+            if ($result->isFailed()) {
+                return [
+                    'status' => 'failed',
+                    'reason' => 'Failed to index element: ' . $result->reason,
+                    'errorDetails' => $result->errorDetails ?? $result->reason
+                ];
             }
 
             return 'Failed to index element: ' . $result->reason; // Indexing failed

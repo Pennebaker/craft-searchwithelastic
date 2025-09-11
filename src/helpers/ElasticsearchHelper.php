@@ -14,7 +14,6 @@ namespace pennebaker\searchwithelastic\helpers;
 use Craft;
 use craft\base\ElementInterface;
 use craft\elements\Asset;
-use craft\elements\Entry;
 use pennebaker\searchwithelastic\SearchWithElastic;
 use pennebaker\searchwithelastic\services\CallbackValidator;
 use RuntimeException;
@@ -31,7 +30,7 @@ class ElasticsearchHelper
     /**
      * Text field with keyword multi-field mapping constant
      * Allows both full-text search and exact matching/aggregations
-     * 
+     *
      * @since 4.0.0
      */
     public const TEXT_WITH_KEYWORD_MAPPING = [
@@ -79,6 +78,30 @@ class ElasticsearchHelper
     public const KEYWORD_FIELD_MAPPING = [
         'type'  => 'keyword',
         'store' => true,
+    ];
+
+    /**
+     * Integer field mapping constant
+     * @since 4.0.0
+     */
+    public const INTEGER_FIELD_MAPPING = [
+        'type' => 'integer'
+    ];
+
+    /**
+     * Long field mapping constant (for large integers)
+     * @since 4.0.0
+     */
+    public const LONG_FIELD_MAPPING = [
+        'type' => 'long'
+    ];
+
+    /**
+     * Float field mapping constant
+     * @since 4.0.0
+     */
+    public const FLOAT_FIELD_MAPPING = [
+        'type' => 'float'
     ];
 
     /**
@@ -249,25 +272,6 @@ class ElasticsearchHelper
         ];
     }
 
-
-    /**
-     * Create an extra field configuration for element order/position
-     *
-     * @param array|null $mapping Optional custom mapping configuration
-     * @return array The extra field configuration
-     * @since 4.0.0
-     */
-    public static function createOrderField(?array $mapping = null): array
-    {
-        return [
-            'mapping' => $mapping ?? self::KEYWORD_FIELD_MAPPING,
-            'highlighter' => (object)[],
-            'value' => function (ElementInterface $element) {
-                return Entry::find()->positionedBefore($element)->count();
-            }
-        ];
-    }
-
     /**
      * Create an extra field configuration for accessing element field values
      *
@@ -286,47 +290,48 @@ class ElasticsearchHelper
                 if (!$entry || !isset($entry->$fieldName)) {
                     return null;
                 }
-                
+
+                /** @var mixed $fieldValue - Could be various Craft field types or Collections */
                 $fieldValue = $entry->$fieldName;
-                
+
                 // Handle null values
                 if ($fieldValue === null) {
                     return null;
                 }
-                
+
                 // If it's an object with common field properties, extract the appropriate value
                 if (is_object($fieldValue)) {
                     // Check for common Craft field value properties
-                    if (isset($fieldValue->value)) {
+                    if (property_exists($fieldValue, 'value') || (method_exists($fieldValue, '__isset') && isset($fieldValue->value))) {
                         return $fieldValue->value;
                     }
-                    if (isset($fieldValue->handle)) {
+                    if (property_exists($fieldValue, 'handle') || (method_exists($fieldValue, '__isset') && isset($fieldValue->handle))) {
                         return $fieldValue->handle;
                     }
-                    if (isset($fieldValue->label)) {
+                    if (property_exists($fieldValue, 'label') || (method_exists($fieldValue, '__isset') && isset($fieldValue->label))) {
                         return $fieldValue->label;
                     }
-                    if (isset($fieldValue->title)) {
+                    if (property_exists($fieldValue, 'title') || (method_exists($fieldValue, '__isset') && isset($fieldValue->title))) {
                         return $fieldValue->title;
                     }
-                    if (isset($fieldValue->name)) {
+                    if (property_exists($fieldValue, 'name') || (method_exists($fieldValue, '__isset') && isset($fieldValue->name))) {
                         return $fieldValue->name;
                     }
-                    
+
                     // If it's a query, get the IDs
                     if ($fieldValue instanceof \craft\elements\db\ElementQuery) {
                         return $fieldValue->ids();
                     }
-                    
+
                     // If we can't extract a simple value, convert to string
                     if (method_exists($fieldValue, '__toString')) {
                         return (string)$fieldValue;
                     }
-                    
+
                     // Last resort - return null to avoid indexing errors
                     return null;
                 }
-                
+
                 // If it's an array, check if it contains objects and extract values
                 if (is_array($fieldValue)) {
                     $values = [];
@@ -347,7 +352,7 @@ class ElasticsearchHelper
                     }
                     return $values;
                 }
-                
+
                 // For scalar values, return as-is
                 return $fieldValue;
             }
@@ -490,7 +495,7 @@ class ElasticsearchHelper
         if ($mapping === null) {
             $mapping = ['type' => 'nested'];
         }
-        
+
         return [
             'mapping' => $mapping,
             'highlighter' => (object)[],
@@ -547,7 +552,7 @@ class ElasticsearchHelper
         if ($mapping === null) {
             $mapping = ['type' => 'nested'];
         }
-        
+
         return [
             'mapping' => $mapping,
             'highlighter' => (object)[],
@@ -719,7 +724,7 @@ class ElasticsearchHelper
                 if (isset($subField['method'])) {
                     $method = $subField['method'];
                     $args = $subField['args'] ?? [];
-                    
+
                     // Use the callback validator for safe method execution
                     $validator = SearchWithElastic::getInstance()->callbackValidator;
                     return $validator->safeMethodCall(

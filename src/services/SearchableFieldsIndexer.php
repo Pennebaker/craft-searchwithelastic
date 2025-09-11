@@ -574,14 +574,34 @@ class SearchableFieldsIndexer extends Component
                 'fields' => []
             ];
             
-            // Recursively extract ONLY searchable fields from matrix blocks
+            // Recursively extract fields from matrix blocks
             $blockFieldLayout = $block->getFieldLayout();
             if ($blockFieldLayout) {
                 foreach ($blockFieldLayout->getCustomFields() as $blockField) {
-                    // Only process fields marked as searchable
-                    if ($blockField->searchable) {
+                    // Check if this is a SuperTable field (always process to check sub-fields)
+                    $isSuperTableField = class_exists('\\verbb\\supertable\\fields\\SuperTableField') && $blockField instanceof \verbb\supertable\fields\SuperTableField;
+                    
+                    // DEBUG: Log field detection
+                    if ($isSuperTableField) {
+                        Craft::info("DEBUG: Found SuperTable field '{$blockField->handle}' in Matrix block, searchable: " . ($blockField->searchable ? 'yes' : 'no'), __METHOD__);
+                    }
+                    
+                    // Process if searchable OR if it's a SuperTable field (which may contain searchable sub-fields)
+                    if ($blockField->searchable || $isSuperTableField) {
                         $blockFieldData = $this->extractFieldData($block, $blockField);
-                        if ($blockFieldData !== null) {
+                        
+                        // DEBUG: Log extraction result
+                        if ($isSuperTableField) {
+                            Craft::info("DEBUG: SuperTable field '{$blockField->handle}' extracted data: " . 
+                                ($blockFieldData !== null ? 'YES' : 'NO') . 
+                                ", has value: " . (!empty($blockFieldData['value']) ? 'YES' : 'NO') .
+                                ", has keywords: " . (!empty($blockFieldData['keywords']) ? 'YES' : 'NO'), __METHOD__);
+                            if ($blockFieldData !== null && isset($blockFieldData['value'])) {
+                                Craft::info("DEBUG: SuperTable value structure: " . json_encode($blockFieldData['value'], JSON_PRETTY_PRINT), __METHOD__);
+                            }
+                        }
+                        
+                        if ($blockFieldData !== null && (!empty($blockFieldData['value']) || !empty($blockFieldData['keywords']))) {
                             $blockData['fields'][$blockField->handle] = $blockFieldData;
                             $hasSearchableContent = true;
                         }
@@ -629,14 +649,17 @@ class SearchableFieldsIndexer extends Component
                 $blockData['typeHandle'] = $blockType ? $blockType->handle : null;
             }
             
-            // Recursively extract ONLY searchable fields from Neo blocks
+            // Recursively extract fields from Neo blocks
             $blockFieldLayout = $block->getFieldLayout();
             if ($blockFieldLayout) {
                 foreach ($blockFieldLayout->getCustomFields() as $blockField) {
-                    // Only process fields marked as searchable
-                    if ($blockField->searchable) {
+                    // Check if this is a SuperTable field (always process to check sub-fields)
+                    $isSuperTableField = class_exists('\\verbb\\supertable\\fields\\SuperTableField') && $blockField instanceof \verbb\supertable\fields\SuperTableField;
+                    
+                    // Process if searchable OR if it's a SuperTable field (which may contain searchable sub-fields)
+                    if ($blockField->searchable || $isSuperTableField) {
                         $blockFieldData = $this->extractFieldData($block, $blockField);
-                        if ($blockFieldData !== null) {
+                        if ($blockFieldData !== null && (!empty($blockFieldData['value']) || !empty($blockFieldData['keywords']))) {
                             $blockData['fields'][$blockField->handle] = $blockFieldData;
                             $hasSearchableContent = true;
                         }

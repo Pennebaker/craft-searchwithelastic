@@ -28,7 +28,6 @@ use pennebaker\searchwithelastic\events\indexing\IndexElementEvent;
 use pennebaker\searchwithelastic\exceptions\IndexElementException;
 use pennebaker\searchwithelastic\models\IndexingResult;
 use pennebaker\searchwithelastic\SearchWithElastic;
-use pennebaker\searchwithelastic\services\CallbackValidator;
 use RuntimeException;
 use yii\base\InvalidConfigException;
 
@@ -46,22 +45,22 @@ class ElementIndexerService extends Component
      * @since 4.0.0
      */
     public const EVENT_CONTENT_EXTRACTION = 'contentExtraction';
-    
+
     /**
      * @since 4.0.0
      */
     public const EVENT_BEFORE_INDEX_ELEMENT = 'beforeIndexElement';
-    
+
     /**
      * @since 4.0.0
      */
     public const EVENT_AFTER_INDEX_ELEMENT = 'afterIndexElement';
-    
+
     /**
      * @since 4.0.0
      */
     public const EVENT_BEFORE_REMOVE_ELEMENT = 'beforeRemoveElement';
-    
+
     /**
      * @since 4.0.0
      */
@@ -160,11 +159,33 @@ class ElementIndexerService extends Component
             return $result;
 
         } catch (\Exception $e) {
-            Craft::error("Failed to index element $element->id: " . $e->getMessage(), __METHOD__);
+            // Log detailed error information
+            $errorDetails = [
+                'elementId' => $element->id,
+                'elementType' => get_class($element),
+                'siteId' => $element->siteId,
+                'title' => $element->title ?? 'No title',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ];
+
+            Craft::error("Failed to index element $element->id: " . json_encode($errorDetails, JSON_PRETTY_PRINT), __METHOD__);
+
+            // Include more context in the error message
+            $detailedError = sprintf(
+                "%s (Element: %s, Type: %s, Site: %s)",
+                $e->getMessage(),
+                $element->id,
+                basename(str_replace('\\', '/', get_class($element))),
+                $element->siteId
+            );
+
             return IndexingResult::failed(
                 'Indexing failed',
-                Craft::t('search-with-elastic', 'Failed to index element: {error}', ['error' => $e->getMessage()]),
-                $e->getMessage()
+                Craft::t('search-with-elastic', 'Failed to index element: {error}', ['error' => $detailedError]),
+                $detailedError
             );
         }
     }
@@ -421,18 +442,21 @@ class ElementIndexerService extends Component
         $settings = SearchWithElastic::getInstance()->getSettings();
         $fetchResult = ['attempted' => false, 'success' => false, 'debugInfo' => []];
 
-        // Try searchable fields extraction first if enabled
-        if ($settings->useSearchableFields) {
+        // Determine field names from settings
+        $searchableFieldName = $settings->searchableContentFieldName ?: 'content';
+        $frontendFieldName = $settings->frontendContentFieldName ?: 'content_fetch';
+
+        // Check if searchable content should be indexed for this element
+        if ($this->shouldUseSearchableContent($element)) {
             try {
                 $searchableFieldsData = SearchWithElastic::getInstance()->searchableFieldsIndexer->extractSearchableFields(
                     $element,
                     ['includeNonSearchable' => $settings->includeNonSearchableFields]
                 );
-                
+
                 if (!empty($searchableFieldsData)) {
-                    $document['searchableFields'] = $searchableFieldsData;
-                    
-                    // Aggregate all keywords for main content field
+                    // Don't store raw searchableFields to avoid Elasticsearch mapping conflicts
+                    // Just aggregate all keywords for the searchable content field
                     $allKeywords = [];
                     foreach ($searchableFieldsData as $fieldData) {
                         if (isset($fieldData['keywords']) && $fieldData['keywords'] !== '') {
@@ -440,27 +464,47 @@ class ElementIndexerService extends Component
                         }
                     }
                     if (!empty($allKeywords)) {
-                        $document['content'] = implode(' ', $allKeywords);
+                        $document[$searchableFieldName] = implode(' ', $allKeywords);
                     }
-                    
-                    $fetchResult['attempted'] = true;
-                    $fetchResult['success'] = true;
-                    $fetchResult['debugInfo']['method'] = 'searchableFields';
-                } elseif ($settings->fallbackToFrontendFetching) {
-                    // Fallback to frontend fetching if searchable fields extraction yielded no data
-                    $fetchResult = $this->addElementContent($element, $document);
+
+                    // Optionally store a simplified field list for debugging
+                    if ($settings->enableFrontendFetchDebug) {
+                        $fieldList = [];
+                        foreach ($searchableFieldsData as $fieldHandle => $fieldData) {
+                            if (!empty($fieldData['keywords'])) {
+                                $fieldList[] = $fieldHandle;
+                            }
+                        }
+                    }
                 }
             } catch (\Exception $e) {
-                Craft::warning("Searchable fields extraction failed for element {$element->id}: " . $e->getMessage(), __METHOD__);
-                
-                if ($settings->fallbackToFrontendFetching) {
-                    // Fallback to frontend fetching on error
-                    $fetchResult = $this->addElementContent($element, $document);
-                }
+                // Log detailed searchable fields extraction error
+                $errorDetails = [
+                    'elementId' => $element->id,
+                    'elementType' => get_class($element),
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ];
+                Craft::error("Searchable fields extraction failed for element {$element->id}: " . json_encode($errorDetails, JSON_PRETTY_PRINT), __METHOD__);
+                // Re-throw to be caught by outer handler
+                throw new \Exception("Searchable fields extraction failed: " . $e->getMessage(), 0, $e);
             }
-        } else {
-            // Use frontend fetching if searchable fields are disabled
-            $fetchResult = $this->addElementContent($element, $document);
+        }
+
+        // Check if frontend content should be fetched for this element
+        if ($this->shouldUseFrontendFetching($element)) {
+            $frontendResult = $this->fetchFrontendContent($element);
+            if ($frontendResult['success'] && !empty($frontendResult['content'])) {
+                $document[$frontendFieldName] = $frontendResult['content'];
+
+                // Keep summary field for backward compatibility
+                $summary = mb_substr($frontendResult['content'], 0, 500);
+                $document['summary'] = $summary;
+            }
+
+            $fetchResult['attempted'] = $frontendResult['attempted'];
+            $fetchResult['success'] = $frontendResult['success'];
+            $fetchResult['debugInfo'] = $frontendResult['debugInfo'] ?? [];
         }
 
         return [
@@ -486,6 +530,17 @@ class ElementIndexerService extends Component
                 /** @var Entry $element */
                 $document['postDate'] = $element->postDate?->format('c');
                 $document['expiryDate'] = $element->expiryDate?->format('c');
+
+                // Add entry order for structure sections
+                if ($element->section->type === 'structure') {
+                    // Get the position of this entry in the structure
+                    $document['order'] = (int) Entry::find()
+                        ->drafts(false)
+                        ->revisions(false)
+                        ->sectionId($element->sectionId)
+                        ->positionedBefore($element)
+                        ->count();
+                }
                 break;
 
             case Asset::class:
@@ -519,12 +574,87 @@ class ElementIndexerService extends Component
     }
 
     /**
+     * Fetch frontend content for an element
+     *
+     * @param Element $element The element to fetch content for
+     * @return array Array with 'attempted', 'success', 'content', and 'debugInfo' keys
+     * @since 4.0.0
+     */
+    protected function fetchFrontendContent(Element $element): array
+    {
+        $result = [
+            'attempted' => false,
+            'success' => false,
+            'content' => '',
+            'debugInfo' => []
+        ];
+
+        try {
+            // Handle assets differently - use Craft's built-in content extraction
+            if ($element instanceof Asset) {
+                // For binary files like PDFs, images, etc., we can't extract text content
+                // But they should still be considered fully indexed based on their metadata
+                $binaryKinds = ['pdf', 'image', 'video', 'audio'];
+                if (in_array($element->kind, $binaryKinds, true)) {
+                    // Don't add content field, but mark as successful
+                    // The asset is fully indexed with its metadata (title, filename, etc.)
+                    return ['attempted' => true, 'success' => true, 'content' => '', 'debugInfo' => []];
+                }
+
+                // For text-based assets, try to get contents
+                $content = $element->getContents();
+                if ($content !== false) {
+                    $contentLength = strlen($content);
+
+                    // Limit content size to prevent memory issues (100KB max)
+                    $maxContentLength = 100 * 1024;
+                    if ($contentLength > $maxContentLength) {
+                        $content = substr($content, 0, $maxContentLength);
+                        $content .= "\n\n[Content truncated due to size limit]";
+                    }
+
+                    // Remove control characters that could cause issues
+                    if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $content)) {
+                        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+                    }
+
+                    return ['attempted' => true, 'success' => true, 'content' => $content, 'debugInfo' => []];
+                }
+
+                // If we can't get contents for a text asset, still mark as successful
+                // The asset metadata is indexed even without content
+                return ['attempted' => true, 'success' => true, 'content' => '', 'debugInfo' => []];
+            }
+
+            // For other element types, fetch content from URL
+            if ($element->getUrl()) {
+                $fetchResult = $this->fetchElementContentWithDebug($element->getUrl(), $element);
+                return [
+                    'attempted' => true,
+                    'success' => $fetchResult['success'],
+                    'content' => $fetchResult['content'] ?? '',
+                    'debugInfo' => $fetchResult['debugInfo'] ?? []
+                ];
+            }
+
+            // Element has no URL for content fetching
+            return $result;
+        } catch (\Exception $e) {
+            Craft::warning("Failed to fetch frontend content for element $element->id: " . $e->getMessage(), __METHOD__);
+            $result['attempted'] = true;
+            $result['debugInfo']['error'] = $e->getMessage();
+            return $result;
+        }
+    }
+
+    /**
      * Add element content to document via frontend fetching or asset content extraction
      *
      * @param Element $element The element to extract content from
      * @param array $document The document array to add content to (passed by reference)
      * @return array Array with 'attempted' and 'success' keys indicating fetch status
      * @since 4.0.0
+     * @deprecated Use fetchFrontendContent() instead
      */
     protected function addElementContent(Element $element, array &$document): array
     {
@@ -901,6 +1031,84 @@ class ElementIndexerService extends Component
     protected function removeElementRecord(Element $element): void
     {
         SearchWithElastic::getInstance()->records->deleteElementRecord($element);
+    }
+
+    /**
+     * Check if searchable content should be indexed for this element
+     *
+     * @param Element $element
+     * @return bool
+     * @since 4.0.0
+     */
+    protected function shouldUseSearchableContent(Element $element): bool
+    {
+        $settings = SearchWithElastic::getInstance()->getSettings();
+
+        // Check if searchable fields are enabled globally
+        if (!$settings->useSearchableFields) {
+            return false;
+        }
+
+        // Check per-element-type settings (opt-out - enabled by default unless excluded)
+        if ($element instanceof Entry) {
+            $entryType = $element->getType();
+            return !in_array($entryType->handle, $settings->excludedSearchableContentEntryTypes, true);
+        } elseif ($element instanceof Category) {
+            $group = $element->getGroup();
+            return !in_array($group->handle, $settings->excludedSearchableContentCategoryGroups, true);
+        } elseif ($element instanceof Asset) {
+            $volume = $element->getVolume();
+            return !in_array($volume->handle, $settings->excludedSearchableContentAssetVolumes, true);
+        } elseif (class_exists(\craft\commerce\elements\Product::class) && $element instanceof \craft\commerce\elements\Product) {
+            $productType = $element->getType();
+            return !in_array($productType->handle, $settings->excludedSearchableContentProductTypes, true);
+        } elseif (class_exists(\craft\digitalproducts\elements\Product::class) && $element instanceof \craft\digitalproducts\elements\Product) {
+            $productType = $element->getType();
+            return !in_array($productType->handle, $settings->excludedSearchableContentDigitalProductTypes, true);
+        }
+
+        // Default to true for unknown element types when searchable fields are enabled
+        return true;
+    }
+
+    /**
+     * Check if frontend content should be fetched for this element
+     *
+     * @param Element $element
+     * @return bool
+     * @since 4.0.0
+     */
+    protected function shouldUseFrontendFetching(Element $element): bool
+    {
+        $settings = SearchWithElastic::getInstance()->getSettings();
+
+        // Check if frontend fetching is enabled globally
+        if (!$settings->enableFrontendFetching) {
+            return false;
+        }
+
+        // Check per-element-type settings (opt-out - enabled by default unless excluded)
+        if ($element instanceof Entry) {
+            $entryType = $element->getType();
+            return !in_array($entryType->handle, $settings->excludedFrontendFetchingEntryTypes, true);
+        } elseif ($element instanceof Category) {
+            $group = $element->getGroup();
+            return !in_array($group->handle, $settings->excludedFrontendFetchingCategoryGroups, true);
+        } elseif ($element instanceof Asset) {
+            $volume = $element->getVolume();
+            // For assets, also check if the kind is in the allowed list
+            return !in_array($volume->handle, $settings->excludedFrontendFetchingAssetVolumes, true) &&
+                   in_array($element->kind, $settings->frontendFetchingAssetKinds, true);
+        } elseif (class_exists(\craft\commerce\elements\Product::class) && $element instanceof \craft\commerce\elements\Product) {
+            $productType = $element->getType();
+            return !in_array($productType->handle, $settings->excludedFrontendFetchingProductTypes, true);
+        } elseif (class_exists(\craft\digitalproducts\elements\Product::class) && $element instanceof \craft\digitalproducts\elements\Product) {
+            $productType = $element->getType();
+            return !in_array($productType->handle, $settings->excludedFrontendFetchingDigitalProductTypes, true);
+        }
+
+        // Default to true for unknown element types when frontend fetching is enabled
+        return true;
     }
 
     /**

@@ -16,6 +16,7 @@ use craft\base\ElementInterface;
 use craft\helpers\ArrayHelper;
 use pennebaker\searchwithelastic\events\connection\ErrorEvent;
 use pennebaker\searchwithelastic\events\indexing\IndexManagementEvent;
+use pennebaker\searchwithelastic\helpers\ElasticsearchHelper;
 use pennebaker\searchwithelastic\SearchWithElastic;
 use yii\elasticsearch\Exception;
 
@@ -287,6 +288,9 @@ class IndexManagementService extends Component
 
         $analyzer = $analyzerMap[substr($language, 0, 2)] ?? 'standard';
 
+        // Build properties dynamically based on what element types are actually indexed
+        $properties = $this->buildDynamicMappingProperties($analyzer);
+
         $config = [
             'settings' => [
                 'number_of_shards' => 1,
@@ -300,52 +304,7 @@ class IndexManagementService extends Component
                 ]
             ],
             'mappings' => [
-                'properties' => [
-                    'elementId' => ['type' => 'integer'],
-                    'siteId' => ['type' => 'integer'],
-                    'elementType' => ['type' => 'keyword'],
-                    'title' => [
-                        'type' => 'text',
-                        'analyzer' => $analyzer,
-                        'fields' => [
-                            'keyword' => ['type' => 'keyword']
-                        ]
-                    ],
-                    'content' => [
-                        'type' => 'text',
-                        'analyzer' => $analyzer
-                    ],
-                    'summary' => [
-                        'type' => 'text',
-                        'analyzer' => $analyzer
-                    ],
-                    'url' => ['type' => 'keyword'],
-                    'slug' => ['type' => 'keyword'],
-                    'status' => ['type' => 'keyword'],
-                    'dateCreated' => ['type' => 'date'],
-                    'dateUpdated' => ['type' => 'date'],
-                    'postDate' => ['type' => 'date'],
-                    'expiryDate' => ['type' => 'date'],
-                    'enabled' => ['type' => 'boolean'],
-                    'archived' => ['type' => 'boolean'],
-                    'searchScore' => ['type' => 'float'],
-                    // Commerce fields
-                    'price' => ['type' => 'float'],
-                    'salePrice' => ['type' => 'float'],
-                    'weight' => ['type' => 'float'],
-                    'sku' => ['type' => 'keyword'],
-                    'stock' => ['type' => 'integer'],
-                    // Asset fields
-                    'filename' => ['type' => 'keyword'],
-                    'kind' => ['type' => 'keyword'],
-                    'size' => ['type' => 'long'],
-                    'width' => ['type' => 'integer'],
-                    'height' => ['type' => 'integer'],
-                    // Category fields
-                    'level' => ['type' => 'integer'],
-                    'lft' => ['type' => 'integer'],
-                    'rgt' => ['type' => 'integer'],
-                ]
+                'properties' => $properties
             ]
         ];
 
@@ -399,5 +358,250 @@ class IndexManagementService extends Component
                 new ErrorEvent($e)
             );
         }
+    }
+
+    /**
+     * Build dynamic mapping properties based on what element types are configured for indexing
+     *
+     * @param string $analyzer The analyzer to use for text fields
+     * @return array The mapping properties array
+     * @since 4.0.0
+     */
+    private function buildDynamicMappingProperties(string $analyzer): array
+    {
+        $settings = SearchWithElastic::getInstance()->getSettings();
+
+        // Start with base mappings that apply to all element types
+        $properties = [
+            'elementId' => ElasticsearchHelper::INTEGER_FIELD_MAPPING,
+            'siteId' => ElasticsearchHelper::INTEGER_FIELD_MAPPING,
+            'elementType' => ['type' => 'keyword'],
+            'title' => [
+                'type' => 'text',
+                'analyzer' => $analyzer,
+                'fields' => [
+                    'keyword' => ['type' => 'keyword']
+                ]
+            ],
+            'slug' => ['type' => 'keyword'],
+            'status' => ['type' => 'keyword'],
+            'dateCreated' => ['type' => 'date'],
+            'dateUpdated' => ['type' => 'date'],
+            'enabled' => ['type' => 'boolean'],
+            'archived' => ['type' => 'boolean'],
+        ];
+
+        // Only add URL field if we're indexing elements with URLs
+        if ($settings->indexElementsWithoutUrls || $this->hasElementsWithUrls()) {
+            $properties['url'] = ['type' => 'keyword'];
+        }
+
+        // Add searchable content field if enabled (default field name: 'content')
+        if ($settings->useSearchableFields) {
+            $searchableFieldName = $settings->searchableContentFieldName ?: 'content';
+            $properties[$searchableFieldName] = [
+                'type' => 'text',
+                'analyzer' => $analyzer
+            ];
+        }
+
+        // Add frontend content field if enabled (default field name: 'content_fetch')
+        if ($settings->enableFrontendFetching) {
+            $frontendFieldName = $settings->frontendContentFieldName ?: 'content_fetch';
+            $properties[$frontendFieldName] = [
+                'type' => 'text',
+                'analyzer' => $analyzer
+            ];
+
+            // Keep summary field for backward compatibility
+            $properties['summary'] = [
+                'type' => 'text',
+                'analyzer' => $analyzer
+            ];
+        }
+
+        // Only add searchScore if it's used in extraFields
+        if ($this->isFieldUsedInExtraFields('searchScore')) {
+            $properties['searchScore'] = ElasticsearchHelper::FLOAT_FIELD_MAPPING;
+        }
+
+        // Add Entry-specific fields only if entries are being indexed
+        if ($this->isElementTypeIndexed(\craft\elements\Entry::class)) {
+            $properties['postDate'] = ['type' => 'date'];
+            $properties['expiryDate'] = ['type' => 'date'];
+
+            // Add native order field for structure sections
+            if ($this->hasStructureSections()) {
+                $properties['order'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+            }
+        }
+
+        // Add Commerce Product fields only if Commerce is installed and products are indexed
+        if (class_exists(\craft\commerce\elements\Product::class) && $this->isElementTypeIndexed(\craft\commerce\elements\Product::class)) {
+            $properties['price'] = ElasticsearchHelper::FLOAT_FIELD_MAPPING;
+            $properties['salePrice'] = ElasticsearchHelper::FLOAT_FIELD_MAPPING;
+            $properties['weight'] = ElasticsearchHelper::FLOAT_FIELD_MAPPING;
+            $properties['sku'] = ['type' => 'keyword'];
+            $properties['stock'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+        }
+
+        // Add Digital Product fields only if Digital Products is installed and indexed
+        // Note: Digital products may share some fields with regular products
+        if (class_exists(\craft\digitalproducts\elements\Product::class) && $this->isElementTypeIndexed(\craft\digitalproducts\elements\Product::class)) {
+            if (!isset($properties['price'])) {
+                $properties['price'] = ElasticsearchHelper::FLOAT_FIELD_MAPPING;
+                $properties['salePrice'] = ElasticsearchHelper::FLOAT_FIELD_MAPPING;
+                $properties['sku'] = ['type' => 'keyword'];
+            }
+        }
+
+        // Add Asset fields only if assets are being indexed
+        if ($this->isElementTypeIndexed(\craft\elements\Asset::class)) {
+            $properties['filename'] = ['type' => 'keyword'];
+            $properties['kind'] = ['type' => 'keyword'];
+            $properties['size'] = ElasticsearchHelper::LONG_FIELD_MAPPING;
+            $properties['width'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+            $properties['height'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+        }
+
+        // Add Category fields only if categories are being indexed
+        if ($this->isElementTypeIndexed(\craft\elements\Category::class)) {
+            $properties['level'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+            $properties['lft'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+            $properties['rgt'] = ElasticsearchHelper::INTEGER_FIELD_MAPPING;
+        }
+
+        return $properties;
+    }
+
+    /**
+     * Check if a specific element type is configured for indexing
+     *
+     * @param string $elementClass The element class to check
+     * @return bool True if the element type should be indexed
+     * @since 4.0.0
+     */
+    private function isElementTypeIndexed(string $elementClass): bool
+    {
+        $settings = SearchWithElastic::getInstance()->getSettings();
+
+        // Check based on element type and settings
+        switch ($elementClass) {
+            case \craft\elements\Entry::class:
+                // Entries are indexed unless all entry types are excluded
+                $allEntryTypes = \Craft::$app->getSections()->getAllEntryTypes();
+                if (empty($allEntryTypes)) {
+                    return false;
+                }
+                $allHandles = array_map(fn($type) => $type->handle, $allEntryTypes);
+                $excluded = $settings->excludedEntryTypes ?? [];
+                return count(array_diff($allHandles, $excluded)) > 0;
+
+            case \craft\elements\Asset::class:
+                // Assets are indexed if any asset kinds are configured
+                return !empty($settings->assetKinds);
+
+            case \craft\elements\Category::class:
+                // Categories are indexed unless all groups are excluded
+                $allGroups = \Craft::$app->getCategories()->getAllGroups();
+                if (empty($allGroups)) {
+                    return false;
+                }
+                $allHandles = array_map(fn($group) => $group->handle, $allGroups);
+                $excluded = $settings->excludedCategoryGroups ?? [];
+                return count(array_diff($allHandles, $excluded)) > 0;
+
+            case \craft\commerce\elements\Product::class:
+                // Products are indexed if Commerce is installed and not all types are excluded
+                if (!class_exists(\craft\commerce\elements\Product::class)) {
+                    return false;
+                }
+                if (!\Craft::$app->getPlugins()->isPluginInstalled('commerce')) {
+                    return false;
+                }
+                $allTypes = \craft\commerce\Plugin::getInstance()->getProductTypes()->getAllProductTypes();
+                if (empty($allTypes)) {
+                    return false;
+                }
+                $allHandles = array_map(fn($type) => $type->handle, $allTypes);
+                $excluded = $settings->excludedProductTypes ?? [];
+                return count(array_diff($allHandles, $excluded)) > 0;
+
+            case \craft\digitalproducts\elements\Product::class:
+                // Digital products are indexed if plugin is installed and not all types are excluded
+                if (!class_exists(\craft\digitalproducts\elements\Product::class)) {
+                    return false;
+                }
+                if (!\Craft::$app->getPlugins()->isPluginInstalled('digital-products')) {
+                    return false;
+                }
+                $allTypes = \craft\digitalproducts\Plugin::getInstance()->getProductTypes()->getAllProductTypes();
+                if (empty($allTypes)) {
+                    return false;
+                }
+                $allHandles = array_map(fn($type) => $type->handle, $allTypes);
+                $excluded = $settings->excludedDigitalProductTypes ?? [];
+                return count(array_diff($allHandles, $excluded)) > 0;
+
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Check if any indexed element types have URLs
+     *
+     * @return bool True if at least one indexed element type typically has URLs
+     * @since 4.0.0
+     */
+    private function hasElementsWithUrls(): bool
+    {
+        // Entries and Categories typically have URLs
+        // Assets might have URLs depending on configuration
+        // Products typically have URLs
+        return $this->isElementTypeIndexed(\craft\elements\Entry::class) ||
+               $this->isElementTypeIndexed(\craft\elements\Category::class) ||
+               (class_exists(\craft\commerce\elements\Product::class) && $this->isElementTypeIndexed(\craft\commerce\elements\Product::class)) ||
+               (class_exists(\craft\digitalproducts\elements\Product::class) && $this->isElementTypeIndexed(\craft\digitalproducts\elements\Product::class));
+    }
+
+    /**
+     * Check if a field is used in the extraFields configuration
+     *
+     * @param string $fieldName The field name to check
+     * @return bool True if the field is referenced in extraFields
+     * @since 4.0.0
+     */
+    private function isFieldUsedInExtraFields(string $fieldName): bool
+    {
+        $extraFields = SearchWithElastic::getInstance()->getSettings()->extraFields ?? [];
+        return isset($extraFields[$fieldName]);
+    }
+
+    /**
+     * Check if there are any structure sections configured for indexing
+     *
+     * @return bool True if at least one structure section is configured for indexing
+     * @since 4.0.0
+     */
+    private function hasStructureSections(): bool
+    {
+        $settings = SearchWithElastic::getInstance()->getSettings();
+        $sections = \Craft::$app->getSections()->getAllSections();
+
+        foreach ($sections as $section) {
+            // Check if this is a structure section
+            if ($section->type === 'structure') {
+                // Check if any of its entry types are not excluded
+                $entryTypes = $section->getEntryTypes();
+                foreach ($entryTypes as $entryType) {
+                    if (!in_array($entryType->handle, $settings->excludedEntryTypes ?? [], true)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 }

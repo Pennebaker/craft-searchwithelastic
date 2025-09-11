@@ -118,30 +118,51 @@ class SettingsModel extends Model
     public array $excludedDigitalProductTypes = [];
 
     /** @var bool A boolean indicating whether frontend content fetching via HTTP requests is enabled */
-    public bool $enableFrontendFetching = true;
+    public bool $enableFrontendFetching = false;
     
     /** @var bool A boolean indicating whether to use CraftCMS searchable fields for indexing */
-    public bool $useSearchableFields = false;
+    public bool $useSearchableFields = true;
     
     /** @var bool A boolean indicating whether to fallback to frontend fetching if searchable fields extraction fails */
     public bool $fallbackToFrontendFetching = true;
     
     /** @var bool A boolean indicating whether to include non-searchable fields in the index */
     public bool $includeNonSearchableFields = false;
+    
+    /** @var string The Elasticsearch field name for searchable content */
+    public string $searchableContentFieldName = 'content';
+    
+    /** @var string The Elasticsearch field name for frontend fetched content */
+    public string $frontendContentFieldName = 'content_fetch';
+    
+    /** @var array A list of handles of entry types that should NOT use searchable content indexing */
+    public array $excludedSearchableContentEntryTypes = [];
+    
+    /** @var array A list of handles of category groups that should NOT use searchable content indexing */
+    public array $excludedSearchableContentCategoryGroups = [];
+    
+    /** @var array A list of handles of product types that should NOT use searchable content indexing */
+    public array $excludedSearchableContentProductTypes = [];
+    
+    /** @var array A list of handles of digital product types that should NOT use searchable content indexing */
+    public array $excludedSearchableContentDigitalProductTypes = [];
+    
+    /** @var array A list of handles of asset volumes that should NOT use searchable content indexing */
+    public array $excludedSearchableContentAssetVolumes = [];
 
-    /** @var array A list of handles of entry types that should not use frontend content fetching */
+    /** @var array A list of handles of entry types that should NOT use frontend content fetching */
     public array $excludedFrontendFetchingEntryTypes = [];
 
-    /** @var array A list of handles of asset volumes that should not use frontend content fetching */
+    /** @var array A list of handles of asset volumes that should NOT use frontend content fetching */
     public array $excludedFrontendFetchingAssetVolumes = [];
 
-    /** @var array A list of handles of category groups that should not use frontend content fetching */
+    /** @var array A list of handles of category groups that should NOT use frontend content fetching */
     public array $excludedFrontendFetchingCategoryGroups = [];
 
-    /** @var array A list of handles of product types that should not use frontend content fetching */
+    /** @var array A list of handles of product types that should NOT use frontend content fetching */
     public array $excludedFrontendFetchingProductTypes = [];
 
-    /** @var array A list of handles of digital product types that should not use frontend content fetching */
+    /** @var array A list of handles of digital product types that should NOT use frontend content fetching */
     public array $excludedFrontendFetchingDigitalProductTypes = [];
 
     /** @var bool A boolean indicating whether elements without URLs should still be indexed */
@@ -250,6 +271,11 @@ class SettingsModel extends Model
             ['useSearchableFields', 'boolean'],
             ['fallbackToFrontendFetching', 'boolean'],
             ['includeNonSearchableFields', 'boolean'],
+            ['searchableContentFieldName', 'string'],
+            ['searchableContentFieldName', 'default', 'value' => 'content'],
+            ['frontendContentFieldName', 'string'],
+            ['frontendContentFieldName', 'default', 'value' => 'content_fetch'],
+            [['excludedSearchableContentEntryTypes', 'excludedSearchableContentAssetVolumes', 'excludedSearchableContentCategoryGroups', 'excludedSearchableContentProductTypes', 'excludedSearchableContentDigitalProductTypes'], 'safe'],
             [['excludedFrontendFetchingEntryTypes', 'excludedFrontendFetchingAssetVolumes', 'excludedFrontendFetchingCategoryGroups', 'excludedFrontendFetchingProductTypes', 'excludedFrontendFetchingDigitalProductTypes'], 'safe'],
             [['assetKinds', 'frontendFetchingAssetKinds'], 'safe'],
             ['indexPrefix', 'string'],
@@ -531,12 +557,17 @@ class SettingsModel extends Model
             $this->addError($field, Craft::t('search-with-elastic', $error));
         }
 
-        // Cleanup exclude arrays using ValidationHelper
+        // Cleanup exclude and enabled arrays using ValidationHelper
         $cleanedArrays = ValidationHelper::cleanupExcludeArrays([
             'excludedEntryTypes' => $this->excludedEntryTypes,
             'excludedCategoryGroups' => $this->excludedCategoryGroups,
             'excludedProductTypes' => $this->excludedProductTypes,
             'excludedDigitalProductTypes' => $this->excludedDigitalProductTypes,
+            'excludedSearchableContentEntryTypes' => $this->excludedSearchableContentEntryTypes,
+            'excludedSearchableContentAssetVolumes' => $this->excludedSearchableContentAssetVolumes,
+            'excludedSearchableContentCategoryGroups' => $this->excludedSearchableContentCategoryGroups,
+            'excludedSearchableContentProductTypes' => $this->excludedSearchableContentProductTypes,
+            'excludedSearchableContentDigitalProductTypes' => $this->excludedSearchableContentDigitalProductTypes,
             'excludedFrontendFetchingEntryTypes' => $this->excludedFrontendFetchingEntryTypes,
             'excludedFrontendFetchingAssetVolumes' => $this->excludedFrontendFetchingAssetVolumes,
             'excludedFrontendFetchingCategoryGroups' => $this->excludedFrontendFetchingCategoryGroups,
