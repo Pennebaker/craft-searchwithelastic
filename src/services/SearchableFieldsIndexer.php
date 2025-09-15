@@ -177,7 +177,6 @@ class SearchableFieldsIndexer extends Component
     protected function extractCustomFields(ElementInterface $element, $fieldLayout, array $config = []): array
     {
         $fields = [];
-        $includeNonSearchable = $config['includeNonSearchable'] ?? false;
         
         foreach ($fieldLayout->getCustomFields() as $field) {
             // Special handling for Matrix, Neo, and SuperTable fields - always process them to check sub-fields
@@ -201,7 +200,7 @@ class SearchableFieldsIndexer extends Component
             }
             
             // For non-Matrix fields, check searchable flag
-            if (!$field->searchable && !$includeNonSearchable) {
+            if (!$field->searchable) {
                 continue;
             }
             

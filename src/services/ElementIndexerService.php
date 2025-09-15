@@ -450,8 +450,7 @@ class ElementIndexerService extends Component
         if ($this->shouldUseSearchableContent($element)) {
             try {
                 $searchableFieldsData = SearchWithElastic::getInstance()->searchableFieldsIndexer->extractSearchableFields(
-                    $element,
-                    ['includeNonSearchable' => $settings->includeNonSearchableFields]
+                    $element
                 );
 
                 if (!empty($searchableFieldsData)) {

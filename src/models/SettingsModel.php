@@ -126,9 +126,6 @@ class SettingsModel extends Model
     /** @var bool A boolean indicating whether to fallback to frontend fetching if searchable fields extraction fails */
     public bool $fallbackToFrontendFetching = true;
     
-    /** @var bool A boolean indicating whether to include non-searchable fields in the index */
-    public bool $includeNonSearchableFields = false;
-    
     /** @var string The Elasticsearch field name for searchable content */
     public string $searchableContentFieldName = 'content';
     
@@ -270,7 +267,6 @@ class SettingsModel extends Model
             ['indexElementsWithoutUrls', 'boolean'],
             ['useSearchableFields', 'boolean'],
             ['fallbackToFrontendFetching', 'boolean'],
-            ['includeNonSearchableFields', 'boolean'],
             ['searchableContentFieldName', 'string'],
             ['searchableContentFieldName', 'default', 'value' => 'content'],
             ['frontendContentFieldName', 'string'],

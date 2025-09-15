@@ -303,6 +303,23 @@
 
     <hr>
 
+    <h2>{{ 'Searchable Fields Configuration'|t('search-with-elastic') }}</h2>
+    {% if 'useSearchableFields' in overrides %}
+        <p class="warning with-icon">{{ 'Searchable fields settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
+    {% endif %}
+    <p class="light">{{ 'Configure how the plugin extracts field content for indexing.'|t('search-with-elastic') }}</p>
+
+    {{ forms.lightswitchField({
+        label:        'Extract Craft Field Content'|t('search-with-elastic'),
+        instructions: 'When enabled, extracts content from Craft\'s field system for indexing using fields marked as searchable. When disabled, only basic element metadata (title, slug, etc.) will be indexed.'|t('search-with-elastic'),
+        id:           'useSearchableFields',
+        name:         'useSearchableFields',
+        on:           settings['useSearchableFields'],
+        disabled:     'useSearchableFields' in overrides,
+    }) }}
+
+    <hr>
+
     <h2>{{ 'Search term highlight'|t('search-with-elastic') }}</h2>
     {% if 'highlight' in overrides %}
         <p class="warning with-icon">{{ 'The highlight settings are being overridden by the configuration file.'|t('search-with-elastic') }}</p>
