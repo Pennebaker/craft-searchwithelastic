@@ -14,6 +14,7 @@ namespace pennebaker\searchwithelastic\helpers;
 use Craft;
 use craft\base\ElementInterface;
 use craft\elements\Asset;
+use craft\elements\db\ElementQuery;
 use pennebaker\searchwithelastic\SearchWithElastic;
 use pennebaker\searchwithelastic\services\CallbackValidator;
 use RuntimeException;
@@ -416,8 +417,12 @@ class ElasticsearchHelper
                 if (!isset($element->$fieldName)) {
                     return null;
                 }
+                $fieldValue = $element->$fieldName;
+                if (!$fieldValue instanceof ElementQuery) {
+                    return null;
+                }
                 $titles = [];
-                $relatedElements = $element->$fieldName->all();
+                $relatedElements = $fieldValue->all();
                 foreach ($relatedElements as $relatedElement) {
                     $titles[] = $relatedElement->title;
                 }
@@ -503,8 +508,12 @@ class ElasticsearchHelper
                 $entry = Craft::$app->entries->getEntryById($element->id);
 
                 if ($entry && $element->$fieldName) {
+                    $fieldValue = $entry->$fieldName;
+                    if (!$fieldValue instanceof ElementQuery) {
+                        return null;
+                    }
                     $images = [];
-                    foreach ($entry->$fieldName->all() as $image) {
+                    foreach ($fieldValue->all() as $image) {
                         $imageData = [
                             'id' => $image->id,
                             'title' => $image->title,
@@ -560,8 +569,12 @@ class ElasticsearchHelper
                 $entry = Craft::$app->entries->getEntryById($element->id);
 
                 if ($entry && $element->$fieldName) {
+                    $fieldValue = $entry->$fieldName;
+                    if (!$fieldValue instanceof ElementQuery) {
+                        return null;
+                    }
                     $assets = [];
-                    foreach ($entry->$fieldName->all() as $asset) {
+                    foreach ($fieldValue->all() as $asset) {
                         $fileType = pathinfo($asset->filename, PATHINFO_EXTENSION);
 
                         $assets[] = [
@@ -596,8 +609,11 @@ class ElasticsearchHelper
                 if (!isset($element->$fieldName)) {
                     return null;
                 }
-
-                $categories = $element->$fieldName->all();
+                $fieldValue = $element->$fieldName;
+                if (!$fieldValue instanceof ElementQuery) {
+                    return null;
+                }
+                $categories = $fieldValue->all();
                 $parentTitles = [];
 
                 foreach ($categories as $category) {
@@ -635,8 +651,11 @@ class ElasticsearchHelper
                 if (!isset($element->$fieldName)) {
                     return null;
                 }
-
-                $categories = $element->$fieldName->all();
+                $fieldValue = $element->$fieldName;
+                if (!$fieldValue instanceof ElementQuery) {
+                    return null;
+                }
+                $categories = $fieldValue->all();
                 $childTitles = [];
 
                 foreach ($categories as $category) {
