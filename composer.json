@@ -25,12 +25,12 @@
     "require": {
         "ext-curl": "*",
         "ext-dom": "*",
-        "craftcms/cms": "^4.0.0",
+        "craftcms/cms": "^5.0.0",
         "yiisoft/yii2-elasticsearch": "^2.1.0"
     },
     "require-dev": {
-        "craftcms/commerce": "^4.0",
-        "craftcms/digital-products": "^3.0"
+        "craftcms/commerce": "^5.0",
+        "craftcms/digital-products": "^4.0"
     },
     "config": {
         "allow-plugins": {

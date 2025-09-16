@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -44,6 +44,7 @@ use DateTimeZone;
 use Exception;
 use pennebaker\searchwithelastic\exceptions\IndexElementException;
 use pennebaker\searchwithelastic\exceptions\IndexingException;
+use pennebaker\searchwithelastic\helpers\ElasticsearchHelper;
 use pennebaker\searchwithelastic\models\SettingsModel;
 use pennebaker\searchwithelastic\services\CallbackValidator;
 use pennebaker\searchwithelastic\services\ElasticsearchService;
@@ -69,7 +70,7 @@ use yii\elasticsearch\DebugPanel;
 use yii\queue\ExecEvent;
 
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -197,7 +198,7 @@ class SearchWithElastic extends Plugin
             // Register the plugin's CP utility
             Event::on(
                 Utilities::class,
-                Utilities::EVENT_REGISTER_UTILITY_TYPES,
+                Utilities::EVENT_REGISTER_UTILITIES,
                 static function (RegisterComponentTypesEvent $event) {
                     $event->types[] = RefreshIndexUtility::class;
                 }
@@ -322,29 +323,29 @@ class SearchWithElastic extends Plugin
         // Get the settings that are being defined by the config file
         $overrides = Craft::$app->getConfig()->getConfigFromFile(strtolower($this->handle));
 
-        $sections = ArrayHelper::map(
-            Craft::$app->sections->getAllSections(),
-            'id',
-            static function (Section $section): array {
-                return [
-                    'label' => Craft::t('site', $section->name),
-                    'types' => ArrayHelper::map(
-                        $section->getEntryTypes(),
-                        'id',
-                        static function ($section): array {
-                            return ['label' => Craft::t('site', $section->name)];
-                        }
-                    ),
-                ];
-            }
-        );
+//        $sections = ArrayHelper::map(
+//            Craft::$app->sections->getAllSections(),
+//            'id',
+//            static function (Section $section): array {
+//                return [
+//                    'label' => Craft::t('site', $section->name),
+//                    'types' => ArrayHelper::map(
+//                        $section->getEntryTypes(),
+//                        'id',
+//                        static function ($section): array {
+//                            return ['label' => Craft::t('site', $section->name)];
+//                        }
+//                    ),
+//                ];
+//            }
+//        );
 
         return Craft::$app->view->renderTemplate(
             'search-with-elastic/cp/settings',
             [
                 'settings'  => $settings,
                 'overrides' => array_keys($overrides),
-                'sections'  => $sections,
+//                'sections'  => $sections,
             ]
         );
     }
@@ -591,7 +592,7 @@ class SearchWithElastic extends Plugin
         /** @var Element $element */
         $element = $event->sender;
 
-        if (!ElementHelper::isDraftOrRevision($element)) {
+        if (!ElasticsearchHelper::shouldSkipIndexing($element)) {
             if ($element->enabled) {
                 $this->reindexQueueManagement->enqueueJob($element->id, $element->siteId, get_class($element));
             } else {

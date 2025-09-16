@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -61,6 +61,11 @@ class IndexableEntryQuery extends IndexableElementQuery
 
         // Apply URL filtering based on settings
         $this->includeElementsWithoutUrls($settings->indexElementsWithoutUrls);
+        
+        // Exclude nested entries (Craft 5 Matrix blocks converted to entries)
+        // These have fieldId or primaryOwnerId set
+        $this->elementQuery->andWhere(['entries.fieldId' => null]);
+        $this->elementQuery->andWhere(['entries.primaryOwnerId' => null]);
 
         return $this;
     }

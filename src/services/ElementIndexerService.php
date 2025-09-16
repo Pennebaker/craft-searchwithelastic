@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -26,6 +26,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use pennebaker\searchwithelastic\events\indexing\ContentExtractionEvent;
 use pennebaker\searchwithelastic\events\indexing\IndexElementEvent;
 use pennebaker\searchwithelastic\exceptions\IndexElementException;
+use pennebaker\searchwithelastic\helpers\ElasticsearchHelper;
 use pennebaker\searchwithelastic\models\IndexingResult;
 use pennebaker\searchwithelastic\SearchWithElastic;
 use RuntimeException;
@@ -268,9 +269,9 @@ class ElementIndexerService extends Component
      */
     protected function getSkipReason(Element $element): string
     {
-        // Check if it's a draft or revision first
-        if (ElementHelper::isDraftOrRevision($element)) {
-            return 'Element is a draft or revision';
+        // Check if element should be skipped
+        if (ElasticsearchHelper::shouldSkipIndexing($element)) {
+            return 'Element is a draft/revision or nested entry';
         }
 
         $settings = SearchWithElastic::getInstance()->getSettings();
@@ -362,8 +363,8 @@ class ElementIndexerService extends Component
      */
     protected function shouldIndexElement(Element $element): bool
     {
-        // Skip drafts and revisions
-        if (ElementHelper::isDraftOrRevision($element)) {
+        // Skip elements that should not be indexed
+        if (ElasticsearchHelper::shouldSkipIndexing($element)) {
             return false;
         }
 

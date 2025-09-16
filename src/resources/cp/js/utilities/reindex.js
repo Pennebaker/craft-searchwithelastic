@@ -1,5 +1,5 @@
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.

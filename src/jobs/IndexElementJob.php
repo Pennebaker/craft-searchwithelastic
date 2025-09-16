@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -16,6 +16,7 @@ use craft\base\ElementInterface;
 use craft\helpers\ElementHelper;
 use craft\queue\BaseJob;
 use pennebaker\searchwithelastic\exceptions\IndexableElementModelException;
+use pennebaker\searchwithelastic\helpers\ElasticsearchHelper;
 use pennebaker\searchwithelastic\models\IndexableElementModel;
 use pennebaker\searchwithelastic\SearchWithElastic;
 use yii\base\InvalidConfigException;
@@ -74,9 +75,9 @@ class IndexElementJob extends BaseJob
         
         $element = $model->getElement();
         
-        // Skip if element is a draft or revision
-        if (ElementHelper::isDraftOrRevision($element)) {
-            Craft::info("Skipping draft/revision element #{$this->elementId} in site #{$this->siteId}", 'search-with-elastic');
+        // Skip if element should not be indexed
+        if (ElasticsearchHelper::shouldSkipIndexing($element)) {
+            Craft::info("Skipping element #{$this->elementId} in site #{$this->siteId} (draft/revision/nested entry)", 'search-with-elastic');
             return;
         }
         

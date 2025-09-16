@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -766,6 +766,41 @@ class ElasticsearchHelper
         }
 
         return null;
+    }
+
+    /**
+     * Check if an element should be skipped from indexing
+     *
+     * Elements should be skipped if they are:
+     * - Drafts or revisions
+     * - Nested entries (have fieldId or primaryOwnerId)
+     *
+     * @param ElementInterface $element The element to check
+     * @return bool True if element should be skipped
+     * @since 4.0.0
+     */
+    public static function shouldSkipIndexing(ElementInterface $element): bool
+    {
+        // Check if it's a draft or revision
+        if (\craft\helpers\ElementHelper::isDraftOrRevision($element)) {
+            return true;
+        }
+
+        // Check if it's a nested entry (Craft 5 Matrix blocks converted to entries)
+        // Nested entries have either fieldId or primaryOwnerId set
+        if ($element instanceof Entry) {
+            // Check for fieldId - indicates this is a nested entry belonging to a field
+            if (!empty($element->fieldId)) {
+                return true;
+            }
+
+            // Check for primaryOwnerId - indicates this is owned by another element
+            if (!empty($element->primaryOwnerId)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

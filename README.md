@@ -1,6 +1,6 @@
 # Search with Elastic
 
-An Elasticsearch integration for Craft CMS 4.x that provides comprehensive search capabilities for your content. This plugin indexes entries, assets, and commerce products while providing fast search results with advanced features like fuzzy matching, faceted filtering, and relevance scoring. Built for scalability, it handles real-time content updates and supports complex queries across large datasets.
+An Elasticsearch integration for Craft CMS 5.x that provides comprehensive search capabilities for your content. This plugin indexes entries, assets, and commerce products while providing fast search results with advanced features like fuzzy matching, faceted filtering, and relevance scoring. Built for scalability, it handles real-time content updates and supports complex queries across large datasets.
 
 ## Features
 
@@ -17,7 +17,7 @@ An Elasticsearch integration for Craft CMS 4.x that provides comprehensive searc
 
 ## Requirements
 
-- Craft CMS 4.x
+- Craft CMS 5.x
 - PHP 8.x
 - Elasticsearch 7.x
 

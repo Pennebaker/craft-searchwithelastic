@@ -28,22 +28,22 @@ class TestSearchableFieldsController extends Controller
      * @var int The element ID to test
      */
     public ?int $elementId = null;
-    
+
     /**
      * @var int The site ID to test
      */
     public ?int $siteId = null;
-    
+
     /**
      * @var bool Whether to include non-searchable fields
      */
     public bool $includeNonSearchable = false;
-    
+
     /**
      * @var bool Whether to show verbose output
      */
     public bool $verbose = false;
-    
+
     /**
      * @var bool Whether to show combined content output
      */
@@ -72,7 +72,7 @@ class TestSearchableFieldsController extends Controller
     {
         $this->stdout("Testing Searchable Fields Extraction\n", BaseConsole::FG_CYAN, BaseConsole::BOLD);
         $this->stdout(str_repeat('=', 50) . "\n\n", BaseConsole::FG_CYAN);
-        
+
         // Get element
         if ($this->elementId) {
             $element = Entry::find()
@@ -85,42 +85,42 @@ class TestSearchableFieldsController extends Controller
                 ->siteId($this->siteId)
                 ->one();
         }
-        
+
         if (!$element) {
             $this->stderr("No element found\n", BaseConsole::FG_RED);
             return ExitCode::DATAERR;
         }
-        
+
         $this->stdout("Testing element: {$element->title} (ID: {$element->id}, Site: {$element->siteId})\n\n");
-        
+
         // Extract searchable fields
         $indexer = SearchWithElastic::getInstance()->searchableFieldsIndexer;
-        
+
         $startTime = microtime(true);
-        
+
         try {
             $searchableFields = $indexer->extractSearchableFields(
                 $element,
                 ['includeNonSearchable' => $this->includeNonSearchable]
             );
-            
+
             $extractionTime = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             $this->stdout("Extraction completed in {$extractionTime}ms\n\n", BaseConsole::FG_GREEN);
-            
+
             if (empty($searchableFields)) {
                 $this->stdout("No searchable fields found\n", BaseConsole::FG_YELLOW);
             } else {
                 $this->stdout("Found " . count($searchableFields) . " searchable fields:\n\n", BaseConsole::FG_GREEN);
-                
+
                 foreach ($searchableFields as $handle => $fieldData) {
                     $this->stdout("Field: {$handle}\n", BaseConsole::FG_YELLOW);
-                    
+
                     if ($this->verbose) {
                         $this->stdout("  Type: {$fieldData['field_type']}\n");
                         $this->stdout("  Name: {$fieldData['field_name']}\n");
                         $this->stdout("  Searchable: " . ($fieldData['searchable'] ? 'Yes' : 'No') . "\n");
-                        
+
                         if (!empty($fieldData['keywords'])) {
                             $keywords = substr($fieldData['keywords'], 0, 200);
                             if (strlen($fieldData['keywords']) > 200) {
@@ -128,19 +128,20 @@ class TestSearchableFieldsController extends Controller
                             }
                             $this->stdout("  Keywords: {$keywords}\n");
                         }
-                        
+
                         if (isset($fieldData['value'])) {
-                            $value = json_encode($fieldData['value'], JSON_PRETTY_PRINT);
-                            if (strlen($value) > 500) {
-                                $value = substr($value, 0, 500) . '...';
+                            $value = json_encode($fieldData['value'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                            $maxLength = 10000;
+                            if (strlen($value) > $maxLength) {
+                                $value = substr($value, 0, $maxLength) . "\n    ... [truncated - showing first {$maxLength} of " . strlen($value) . " characters]";
                             }
                             $this->stdout("  Value: {$value}\n");
                         }
-                        
+
                         $this->stdout("\n");
                     }
                 }
-                
+
                 // Calculate total size
                 $totalKeywords = 0;
                 foreach ($searchableFields as $fieldData) {
@@ -148,35 +149,35 @@ class TestSearchableFieldsController extends Controller
                         $totalKeywords += strlen($fieldData['keywords']);
                     }
                 }
-                
+
                 $this->stdout("\nSummary:\n", BaseConsole::FG_CYAN, BaseConsole::BOLD);
                 $this->stdout("  Total fields extracted: " . count($searchableFields) . "\n");
                 $this->stdout("  Total keywords size: " . number_format($totalKeywords) . " bytes\n");
                 $this->stdout("  Extraction time: {$extractionTime}ms\n");
-                
+
                 // Show combined content if requested
                 if ($this->showCombined) {
                     $this->stdout("\n" . str_repeat('=', 50) . "\n", BaseConsole::FG_CYAN);
                     $this->stdout("COMBINED CONTENT OUTPUT\n", BaseConsole::FG_CYAN, BaseConsole::BOLD);
                     $this->stdout(str_repeat('=', 50) . "\n\n", BaseConsole::FG_CYAN);
-                    
+
                     // Build combined content similar to what would go in Elasticsearch
                     $combinedLines = [];
-                    
+
                     // Add title first if it exists
                     if (isset($searchableFields['title'])) {
                         $combinedLines[] = strip_tags($searchableFields['title']['keywords'] ?? '');
                     }
-                    
+
                     // Process all other fields
                     foreach ($searchableFields as $handle => $fieldData) {
                         if ($handle === 'title') continue; // Already added
-                        
+
                         // Handle Matrix, Neo, and SuperTable fields specially - they contain searchable sub-fields
                         $isNeoField = isset($fieldData['field_type']) && str_contains($fieldData['field_type'], 'neo\\Field');
                         $isSuperTableField = isset($fieldData['field_type']) && str_contains($fieldData['field_type'], 'supertable\\fields\\SuperTableField');
                         $isTableMakerField = isset($fieldData['field_type']) && str_contains($fieldData['field_type'], 'tablemaker\\fields\\TableMakerField');
-                        
+
                         if (($fieldData['field_type'] === 'craft\\fields\\Matrix' || $isNeoField || $isSuperTableField) && isset($fieldData['value'])) {
                             // Process Matrix, Neo, or SuperTable fields specially
                             if ($fieldData['field_type'] === 'craft\\fields\\Matrix') {
@@ -186,7 +187,7 @@ class TestSearchableFieldsController extends Controller
                             } elseif ($isSuperTableField) {
                                 // Processing SuperTable field
                             }
-                            
+
                             // Extract text from Matrix/Neo/SuperTable blocks (searchable sub-fields)
                             // Extract text from Matrix/Neo/SuperTable blocks (searchable sub-fields)
                             $blockContent = $this->extractBlockContent($fieldData['value']);
@@ -203,19 +204,19 @@ class TestSearchableFieldsController extends Controller
                             // Regular fields with keywords
                             $cleanContent = strip_tags($fieldData['keywords']);
                             $cleanContent = preg_replace('/\s+/', ' ', trim($cleanContent));
-                            
+
                             if (!empty($cleanContent)) {
                                 $combinedLines[] = $cleanContent;
                             }
                         }
                     }
-                    
+
                     // Display the combined content
                     $combinedContent = implode("\n", $combinedLines);
-                    
+
                     $this->stdout("\nCombined searchable content (" . strlen($combinedContent) . " bytes):\n", BaseConsole::FG_YELLOW);
                     $this->stdout(str_repeat('-', 50) . "\n", BaseConsole::FG_CYAN);
-                    
+
                     // Show first 2000 chars or full content if less
                     if (strlen($combinedContent) > 2000) {
                         $this->stdout(substr($combinedContent, 0, 2000) . "\n");
@@ -223,9 +224,9 @@ class TestSearchableFieldsController extends Controller
                     } else {
                         $this->stdout($combinedContent . "\n");
                     }
-                    
+
                     $this->stdout(str_repeat('-', 50) . "\n", BaseConsole::FG_CYAN);
-                    
+
                     // Show how this would look as a single Elasticsearch field
                     $this->stdout("\nElasticsearch 'content' field structure:\n", BaseConsole::FG_CYAN, BaseConsole::BOLD);
                     $this->stdout("{\n");
@@ -236,7 +237,7 @@ class TestSearchableFieldsController extends Controller
                     $this->stdout("}\n");
                 }
             }
-            
+
         } catch (\Exception $e) {
             $this->stderr("\nExtraction failed: " . $e->getMessage() . "\n", BaseConsole::FG_RED);
             if ($this->verbose) {
@@ -244,10 +245,10 @@ class TestSearchableFieldsController extends Controller
             }
             return ExitCode::SOFTWARE;
         }
-        
+
         return ExitCode::OK;
     }
-    
+
     /**
      * Compare searchable fields extraction with frontend fetching
      *
@@ -257,7 +258,7 @@ class TestSearchableFieldsController extends Controller
     {
         $this->stdout("Comparing Searchable Fields vs Frontend Fetching\n", BaseConsole::FG_CYAN, BaseConsole::BOLD);
         $this->stdout(str_repeat('=', 50) . "\n\n", BaseConsole::FG_CYAN);
-        
+
         // Get element
         if ($this->elementId) {
             $element = Entry::find()
@@ -270,106 +271,106 @@ class TestSearchableFieldsController extends Controller
                 ->siteId($this->siteId)
                 ->one();
         }
-        
+
         if (!$element) {
             $this->stderr("No element found\n", BaseConsole::FG_RED);
             return ExitCode::DATAERR;
         }
-        
+
         $this->stdout("Comparing element: {$element->title} (ID: {$element->id}, Site: {$element->siteId})\n\n");
-        
+
         // Test searchable fields extraction
         $indexer = SearchWithElastic::getInstance()->searchableFieldsIndexer;
-        
+
         $this->stdout("1. Searchable Fields Extraction:\n", BaseConsole::FG_YELLOW, BaseConsole::BOLD);
         $this->stdout(str_repeat('-', 30) . "\n");
-        
+
         $searchableStart = microtime(true);
         $searchableMemStart = memory_get_usage(true);
-        
+
         try {
             $searchableFields = $indexer->extractSearchableFields(
                 $element,
                 ['includeNonSearchable' => $this->includeNonSearchable]
             );
-            
+
             $searchableTime = round((microtime(true) - $searchableStart) * 1000, 2);
             $searchableMemory = memory_get_usage(true) - $searchableMemStart;
-            
+
             $searchableSize = 0;
             foreach ($searchableFields as $fieldData) {
                 if (!empty($fieldData['keywords'])) {
                     $searchableSize += strlen($fieldData['keywords']);
                 }
             }
-            
+
             $this->stdout("  Fields extracted: " . count($searchableFields) . "\n");
             $this->stdout("  Total size: " . number_format($searchableSize) . " bytes\n");
             $this->stdout("  Time: {$searchableTime}ms\n");
             $this->stdout("  Memory: " . number_format($searchableMemory) . " bytes\n");
-            
+
         } catch (\Exception $e) {
             $this->stderr("  Failed: " . $e->getMessage() . "\n", BaseConsole::FG_RED);
             $searchableTime = 0;
             $searchableSize = 0;
         }
-        
+
         $this->stdout("\n");
-        
+
         // Test frontend fetching
         $this->stdout("2. Frontend Fetching:\n", BaseConsole::FG_YELLOW, BaseConsole::BOLD);
         $this->stdout(str_repeat('-', 30) . "\n");
-        
+
         $frontendStart = microtime(true);
         $frontendMemStart = memory_get_usage(true);
-        
+
         try {
             $elasticsearchHelper = new ElasticsearchHelper();
             $frontendContent = $elasticsearchHelper->fetchPageContent($element->url);
-            
+
             $frontendTime = round((microtime(true) - $frontendStart) * 1000, 2);
             $frontendMemory = memory_get_usage(true) - $frontendMemStart;
             $frontendSize = strlen($frontendContent);
-            
+
             $this->stdout("  Content fetched: Yes\n");
             $this->stdout("  Total size: " . number_format($frontendSize) . " bytes\n");
             $this->stdout("  Time: {$frontendTime}ms\n");
             $this->stdout("  Memory: " . number_format($frontendMemory) . " bytes\n");
-            
+
         } catch (\Exception $e) {
             $this->stderr("  Failed: " . $e->getMessage() . "\n", BaseConsole::FG_RED);
             $frontendTime = 0;
             $frontendSize = 0;
         }
-        
+
         // Display comparison
         $this->stdout("\n" . str_repeat('=', 50) . "\n", BaseConsole::FG_CYAN);
         $this->stdout("COMPARISON RESULTS\n", BaseConsole::FG_CYAN, BaseConsole::BOLD);
         $this->stdout(str_repeat('=', 50) . "\n\n", BaseConsole::FG_CYAN);
-        
+
         if ($searchableTime > 0 && $frontendTime > 0) {
             $speedImprovement = round((($frontendTime - $searchableTime) / $frontendTime) * 100, 1);
             $sizeRatio = $frontendSize > 0 ? round(($searchableSize / $frontendSize) * 100, 1) : 0;
-            
+
             $this->stdout("Performance:\n", BaseConsole::FG_GREEN, BaseConsole::BOLD);
             $this->stdout("  Searchable Fields: {$searchableTime}ms\n");
             $this->stdout("  Frontend Fetching: {$frontendTime}ms\n");
-            
+
             if ($speedImprovement > 0) {
                 $this->stdout("  → Searchable fields is {$speedImprovement}% faster\n", BaseConsole::FG_GREEN);
             } else {
                 $this->stdout("  → Frontend fetching is " . abs($speedImprovement) . "% faster\n", BaseConsole::FG_YELLOW);
             }
-            
+
             $this->stdout("\nContent Size:\n", BaseConsole::FG_GREEN, BaseConsole::BOLD);
             $this->stdout("  Searchable Fields: " . number_format($searchableSize) . " bytes\n");
             $this->stdout("  Frontend Fetching: " . number_format($frontendSize) . " bytes\n");
             $this->stdout("  → Searchable fields captures {$sizeRatio}% of frontend content\n");
         }
-        
+
         return ExitCode::OK;
     }
-    
+
     /**
      * Extract text content from Matrix, Neo, or SuperTable field data
      *
@@ -379,54 +380,74 @@ class TestSearchableFieldsController extends Controller
     protected function extractBlockContent($blockValue): string
     {
         $lines = [];
-        
+
         if (is_array($blockValue)) {
             // Check if this looks like SuperTable data (all blocks have same field structure)
             $isSuperTable = $this->isSuperTableData($blockValue);
-            
+
             if ($isSuperTable) {
                 // Format as table with headers
                 $headers = [];
                 $rows = [];
-                
+
+                // Debug: Show what we're working with
+                if ($this->verbose) {
+                    $this->stdout("DEBUG: Processing SuperTable with " . count($blockValue) . " blocks\n", BaseConsole::FG_YELLOW);
+                }
+
                 // First pass: collect all headers from all rows
                 foreach ($blockValue as $block) {
                     if (isset($block['fields']) && is_array($block['fields'])) {
                         foreach ($block['fields'] as $fieldHandle => $fieldData) {
-                            if (is_array($fieldData) && !empty($fieldData['searchable'])) {
-                                // Collect all unique headers from all rows
-                                if (!isset($headers[$fieldHandle])) {
-                                    $headers[$fieldHandle] = $fieldData['field_name'] ?? $fieldHandle;
+                            if (is_array($fieldData)) {
+                                // For SuperTable fields, include fields that have keywords or value
+                                // even if not explicitly marked searchable
+                                if (!empty($fieldData['searchable']) ||
+                                    !empty($fieldData['keywords']) ||
+                                    !empty($fieldData['value'])) {
+                                    // Collect all unique headers from all rows
+                                    if (!isset($headers[$fieldHandle])) {
+                                        $headers[$fieldHandle] = $fieldData['field_name'] ?? $fieldHandle;
+                                        if ($this->verbose) {
+                                            $this->stdout("  Found header: {$headers[$fieldHandle]} (handle: $fieldHandle)\n", BaseConsole::FG_CYAN);
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                
+
                 // Second pass: build row data
                 foreach ($blockValue as $block) {
                     if (isset($block['fields']) && is_array($block['fields'])) {
                         $rowData = [];
-                        
+
                         foreach ($block['fields'] as $fieldHandle => $fieldData) {
-                            if (is_array($fieldData) && !empty($fieldData['searchable'])) {
-                                // Get the content
-                                $content = $this->extractFieldContent($fieldData);
-                                $rowData[$fieldHandle] = $content;
+                            if (is_array($fieldData)) {
+                                // For SuperTable fields, include fields that have keywords or value
+                                // even if not explicitly marked searchable
+                                if (!empty($fieldData['searchable']) ||
+                                    !empty($fieldData['keywords']) ||
+                                    !empty($fieldData['value'])) {
+                                    // Get the content
+                                    $content = $this->extractFieldContent($fieldData);
+                                    $rowData[$fieldHandle] = $content;
+                                }
                             }
                         }
-                        
+
                         if (!empty($rowData)) {
                             $rows[] = $rowData;
                         }
                     }
                 }
-                
+
                 // Build table output
                 if (!empty($headers) && !empty($rows)) {
                     // Add headers
                     $lines[] = implode(' ', array_values($headers));
-                    
+
                     // Add rows
                     foreach ($rows as $row) {
                         $rowValues = [];
@@ -442,7 +463,7 @@ class TestSearchableFieldsController extends Controller
                     if (isset($block['fields']) && is_array($block['fields'])) {
                         foreach ($block['fields'] as $fieldHandle => $fieldData) {
                             if (is_array($fieldData)) {
-                                
+
                                 // Check if this is a nested SuperTable field (it may not be marked searchable itself)
                                 if (isset($fieldData['field_type']) && str_contains($fieldData['field_type'], 'supertable\\fields\\SuperTableField') && isset($fieldData['value'])) {
                                     // Format nested SuperTable as a table
@@ -463,10 +484,10 @@ class TestSearchableFieldsController extends Controller
                 }
             }
         }
-        
+
         return implode("\n", $lines);
     }
-    
+
     /**
      * Check if data looks like SuperTable (consistent field structure across blocks)
      *
@@ -478,19 +499,27 @@ class TestSearchableFieldsController extends Controller
         if (empty($blockValue)) {
             return false;
         }
-        
-        // Matrix/Neo blocks have 'typeHandle' property, SuperTable blocks don't
-        // Also, SuperTable blocks should have consistent field structure
+
+        // SuperTable blocks have a typeHandle that starts with the field handle + "Block"
+        // and all blocks have the same typeHandle
+        // Matrix blocks have different typeHandles for different block types
+        // Neo blocks have a 'level' property
         $fieldSets = [];
-        $hasTypeHandle = false;
-        
+        $typeHandles = [];
+        $hasLevel = false;
+
         foreach ($blockValue as $block) {
-            // Check for Matrix/Neo indicators
-            if (isset($block['typeHandle']) || isset($block['level'])) {
-                $hasTypeHandle = true;
+            // Neo blocks have 'level' property
+            if (isset($block['level'])) {
+                $hasLevel = true;
                 break;
             }
-            
+
+            // Collect typeHandles
+            if (isset($block['typeHandle'])) {
+                $typeHandles[] = $block['typeHandle'];
+            }
+
             // Collect field names for each block
             if (isset($block['fields']) && is_array($block['fields'])) {
                 $fieldNames = array_keys($block['fields']);
@@ -498,23 +527,30 @@ class TestSearchableFieldsController extends Controller
                 $fieldSets[] = implode(',', $fieldNames);
             }
         }
-        
-        // If has typeHandle or level, it's Matrix/Neo, not SuperTable
-        if ($hasTypeHandle) {
+
+        // If has level, it's Neo, not SuperTable
+        if ($hasLevel) {
             return false;
         }
-        
-        // SuperTable blocks should all have the same field structure
-        // Check if all blocks have identical field sets
-        if (count($fieldSets) > 0) {
-            $uniqueFieldSets = array_unique($fieldSets);
-            // If all blocks have the same field structure, it's likely SuperTable
-            return count($uniqueFieldSets) === 1;
+
+        // Check if all blocks have identical typeHandles and field sets
+        $uniqueTypeHandles = array_unique($typeHandles);
+        $uniqueFieldSets = array_unique($fieldSets);
+
+        // SuperTable: all blocks have the same typeHandle and same field structure
+        // Matrix: blocks can have different typeHandles
+        // If all blocks have same typeHandle ending in "Block" and same fields, it's SuperTable
+        if (count($uniqueTypeHandles) === 1 && count($uniqueFieldSets) === 1) {
+            $typeHandle = $uniqueTypeHandles[0] ?? '';
+            // SuperTable typeHandles usually end with "Block"
+            if (str_ends_with($typeHandle, 'Block')) {
+                return true;
+            }
         }
-        
+
         return false;
     }
-    
+
     /**
      * Extract content from a field data array
      *
@@ -524,7 +560,7 @@ class TestSearchableFieldsController extends Controller
     protected function extractFieldContent(array $fieldData): string
     {
         $content = '';
-        
+
         // Try to get content from keywords or value
         if (!empty($fieldData['keywords'])) {
             $content = $fieldData['keywords'];
@@ -536,15 +572,15 @@ class TestSearchableFieldsController extends Controller
                 $content = json_encode($fieldData['value']);
             }
         }
-        
+
         if (!empty($content)) {
             $content = strip_tags($content);
             $content = preg_replace('/\s+/', ' ', trim($content));
         }
-        
+
         return $content;
     }
-    
+
     /**
      * Format TableMaker content as a readable table
      *
@@ -556,9 +592,9 @@ class TestSearchableFieldsController extends Controller
         if (!is_array($tableValue)) {
             return '';
         }
-        
+
         $lines = [];
-        
+
         // Add column headers if they exist
         if (isset($tableValue['columns']) && is_array($tableValue['columns'])) {
             $headers = implode(' ', $tableValue['columns']);
@@ -566,7 +602,7 @@ class TestSearchableFieldsController extends Controller
                 $lines[] = $headers;
             }
         }
-        
+
         // Add row data
         if (isset($tableValue['rows']) && is_array($tableValue['rows'])) {
             foreach ($tableValue['rows'] as $row) {
@@ -578,7 +614,7 @@ class TestSearchableFieldsController extends Controller
                 }
             }
         }
-        
+
         return implode("\n", $lines);
     }
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -489,7 +489,7 @@ class IndexManagementService extends Component
         switch ($elementClass) {
             case \craft\elements\Entry::class:
                 // Entries are indexed unless all entry types are excluded
-                $allEntryTypes = \Craft::$app->getSections()->getAllEntryTypes();
+                $allEntryTypes = \Craft::$app->entries->getAllEntryTypes();
                 if (empty($allEntryTypes)) {
                     return false;
                 }
@@ -587,7 +587,7 @@ class IndexManagementService extends Component
     private function hasStructureSections(): bool
     {
         $settings = SearchWithElastic::getInstance()->getSettings();
-        $sections = \Craft::$app->getSections()->getAllSections();
+        $sections = \Craft::$app->entries->getAllSections();
 
         foreach ($sections as $section) {
             // Check if this is a structure section

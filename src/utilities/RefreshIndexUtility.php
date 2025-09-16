@@ -1,6 +1,6 @@
 <?php
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -68,7 +68,7 @@ class RefreshIndexUtility extends Utility
      * @return string|null The path to the utility SVG icon
      * @since 4.0.0
      */
-    public static function iconPath(): ?string
+    public static function icon(): ?string
     {
         return Craft::getAlias('@pennebaker/searchwithelastic/icon-mask.svg');
     }

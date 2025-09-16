@@ -1,7 +1,7 @@
 {# @var craft \craft\web\twig\variables\CraftVariable #}
 {#
 /**
- * Search w/Elastic plugin for Craft CMS 4.x
+ * Search w/Elastic plugin for Craft CMS 5.x
  *
  * Provides high-performance search across all content types with real-time
  * indexing, advanced querying, and production reliability.
@@ -397,7 +397,7 @@
     <div class="field">
         {# Group entry types by handle to consolidate sections using same entry type #}
         {% set entryTypeGroups = {} %}
-        {% for section in craft.app.sections.allSections %}
+        {% for section in craft.app.entries.allSections %}
             {% for entryType in section.entryTypes %}
                 {% set handle = entryType.handle %}
                 {% if entryTypeGroups[handle] is not defined %}
