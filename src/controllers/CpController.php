@@ -17,6 +17,7 @@ use craft\digitalproducts\elements\Product as DigitalProduct;
 use craft\elements\Asset;
 use craft\elements\Category;
 use craft\elements\Entry;
+use craft\helpers\App;
 use craft\helpers\UrlHelper;
 use craft\i18n\Locale;
 use craft\web\Controller;
@@ -115,7 +116,7 @@ class CpController extends Controller
                 Craft::t(
                     SearchWithElastic::PLUGIN_HANDLE,
                     'Successfully connected to {elasticsearchEndpoint}',
-                    ['elasticsearchEndpoint' => $settings->elasticsearchEndpoint]
+                    ['elasticsearchEndpoint' => App::parseEnv($settings->elasticsearchEndpoint)]
                 )
             );
         } else {
@@ -123,7 +124,7 @@ class CpController extends Controller
                 Craft::t(
                     SearchWithElastic::PLUGIN_HANDLE,
                     'Could not establish connection with {elasticsearchEndpoint}',
-                    ['elasticsearchEndpoint' => $settings->elasticsearchEndpoint]
+                    ['elasticsearchEndpoint' => App::parseEnv($settings->elasticsearchEndpoint)]
                 )
             );
         }
@@ -208,15 +209,15 @@ class CpController extends Controller
                 // Extract detailed error information if available
                 $errorMessage = is_array($result) ? $result['reason'] : $result;
                 $errorDetails = '';
-                
+
                 // If there's additional error information, include it
                 if (is_array($result) && isset($result['errorDetails'])) {
                     $errorDetails = $result['errorDetails'];
                 }
-                
+
                 // Log the full error for debugging
                 Craft::error("Indexing failed for element $elementId: $errorMessage" . ($errorDetails ? " Details: $errorDetails" : ''), __METHOD__);
-                
+
                 return $this->asJson([
                     'success' => false,
                     'error' => $errorMessage,
@@ -803,7 +804,7 @@ class CpController extends Controller
         $model->elementId = $elementId;
         $model->siteId = $siteId;
         $model->type = $elementType;
-        
+
         try {
             $element = $model->getElement();
         } catch (\Exception $e) {
@@ -814,7 +815,7 @@ class CpController extends Controller
                 'errorDetails' => 'Could not load element ID ' . $elementId . ' in site ' . $siteId
             ];
         }
-        
+
         if (!$element) {
             Craft::error("Element {$elementId} not found in site {$siteId}", __METHOD__);
             return [
@@ -834,7 +835,7 @@ class CpController extends Controller
             } catch (\Exception $e) {
                 // Log the full exception for debugging
                 Craft::error("Exception during indexing of element {$element->id}: " . $e->getMessage() . "\nTrace: " . $e->getTraceAsString(), __METHOD__);
-                
+
                 // Return detailed error information
                 return [
                     'status' => 'failed',

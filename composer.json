@@ -23,6 +23,7 @@
         }
     ],
     "require": {
+        "ext-curl": "*",
         "ext-dom": "*",
         "craftcms/cms": "^4.0.0",
         "yiisoft/yii2-elasticsearch": "^2.1.0"

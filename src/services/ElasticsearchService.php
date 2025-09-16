@@ -18,6 +18,7 @@ use craft\elements\Asset;
 use craft\elements\Category;
 use craft\elements\Entry;
 use craft\errors\SiteNotFoundException;
+use craft\helpers\App;
 use craft\helpers\Db;
 use DateTime;
 use Exception;
@@ -56,7 +57,7 @@ class ElasticsearchService extends Component
 
         // Fire a 'beforeConnectionTest' event
         $event = new ConnectionTestEvent([
-            'endpoint' => $settings->elasticsearchEndpoint,
+            'endpoint' => App::parseEnv($settings->elasticsearchEndpoint),
             'config' => [
                 'isAuthEnabled' => $settings->isAuthEnabled,
                 'username' => $settings->username ? '***' : null, // Don't expose password
@@ -339,19 +340,19 @@ class ElasticsearchService extends Component
                 // Use aggregation template for aggregation searches
                 $templateService = SearchWithElastic::getInstance()->searchTemplates;
                 $templateService->initializeTemplates();
-                
+
                 // Build params for aggregation template
                 $params = [
                     'aggregations' => $options['aggregations'],
                     'size' => $size
                 ];
-                
+
                 // Add query if provided
                 if (!empty($searchQuery)) {
                     $params['query_text'] = $searchQuery;
                     $params['search_fields'] = $options['search_fields'] ?? $fields;
                 }
-                
+
                 $queryResult = [
                     'template_id' => SearchTemplates::TEMPLATE_AGGREGATION_SEARCH,
                     'params' => $params
@@ -381,20 +382,20 @@ class ElasticsearchService extends Component
 
             // Get highlight settings from plugin configuration
             $settings = SearchWithElastic::getInstance()->getSettings();
-            
+
             // Check if we got template parameters or a direct query
             if (isset($queryResult['template_id']) && isset($queryResult['params'])) {
                 // Use template-based search for security
                 $templateService = SearchWithElastic::getInstance()->searchTemplates;
-                
+
                 // Ensure templates are initialized
                 $templateService->initializeTemplates();
-                
+
                 // Prepare search options
                 $searchOptions = [
                     'size' => $size
                 ];
-                
+
                 // Add highlighting if configured
                 if (!empty($settings->highlight['pre_tags']) || !empty($settings->highlight['post_tags'])) {
                     $searchOptions['highlight'] = [
@@ -402,14 +403,14 @@ class ElasticsearchService extends Component
                         'post_tags' => [$settings->highlight['post_tags']],
                         'fields' => []
                     ];
-                    
+
                     foreach ($fields as $field) {
                         $searchOptions['highlight']['fields'][$field] = (object)[];
                     }
                 }
-                
+
                 Craft::info("Searching index '$indexName' with template '" . $queryResult['template_id'] . "' and query: " . $query . " (fuzzy: " . ($fuzzy ? 'yes' : 'no') . ")", __METHOD__);
-                
+
                 $response = $templateService->executeTemplateSearch(
                     $queryResult['template_id'],
                     $queryResult['params'],
@@ -419,7 +420,7 @@ class ElasticsearchService extends Component
             } else {
                 // Fallback to direct query (for match_all or backward compatibility)
                 // For Elasticsearch 7+, size and highlight are top-level parameters
-                
+
                 // Check if queryResult already contains a complete body structure
                 if (isset($queryResult['query']) || isset($queryResult['aggs']) || isset($queryResult['post_filter'])) {
                     // This is a complete Elasticsearch body with query/aggregations/post_filter
@@ -428,7 +429,7 @@ class ElasticsearchService extends Component
                     if (!isset($body['size'])) {
                         $body['size'] = $size;
                     }
-                    
+
                     $searchParams = [
                         'index' => $indexName,
                         'body' => $body
@@ -443,40 +444,40 @@ class ElasticsearchService extends Component
                         ]
                     ];
                 }
-                
+
                 // Add highlighting if configured - as a top-level parameter
                 if (!empty($settings->highlight['pre_tags']) || !empty($settings->highlight['post_tags'])) {
                     $highlightFields = [];
                     foreach ($fields as $field) {
                         $highlightFields[$field] = new \stdClass();
                     }
-                    
+
                     $searchParams['highlight'] = [
                         'pre_tags' => [$settings->highlight['pre_tags']],
                         'post_tags' => [$settings->highlight['post_tags']],
                         'fields' => $highlightFields
                     ];
                 }
-                
+
                 Craft::info("Searching index '$indexName' with direct query: " . $query . " (fuzzy: " . ($fuzzy ? 'yes' : 'no') . ")", __METHOD__);
                 Craft::info("Search params: " . json_encode($searchParams, JSON_THROW_ON_ERROR), __METHOD__);
-                
+
                 // Use direct service to bypass Yii2 Elasticsearch library issues
                 $response = ElasticsearchDirectService::search($searchParams);
             }
-            
+
             // Check if we need to return the full response structure
             // This includes queries with aggregations, post_filter, or size: 0
             $hasAggregations = isset($options['aggs']) || isset($options['aggregations']);
             $hasPostFilter = isset($options['post_filter']);
             $isAggregationOnly = isset($options['size']) && $options['size'] === 0;
-            
+
             // Always return full structure when aggregations are requested
             if ($hasAggregations || $hasPostFilter || $isAggregationOnly) {
                 // Log what we're returning
                 Craft::info("Returning full response structure with aggregations", __METHOD__);
                 Craft::info("Has aggregations in response: " . (isset($response['aggregations']) ? 'yes' : 'no'), __METHOD__);
-                
+
                 // For aggregation queries, return the full response with aggregations
                 // This allows templates to access response.aggregations
                 $result = [
@@ -484,16 +485,16 @@ class ElasticsearchService extends Component
                     'total' => $response['hits']['total'] ?? 0,
                     'aggregations' => $response['aggregations'] ?? []
                 ];
-                
+
                 // Fire an 'afterSearch' event
                 if ($this->hasEventHandlers(self::EVENT_AFTER_SEARCH)) {
                     $event->params['results'] = $result;
                     $this->trigger(self::EVENT_AFTER_SEARCH, $event);
                 }
-                
+
                 return $result;
             }
-            
+
             // For regular search queries, return just the hits array
             $hits = $response['hits']['hits'] ?? [];
 
@@ -969,7 +970,7 @@ class ElasticsearchService extends Component
     private function buildFieldsWithBoosts(array $fields): array
     {
         $fieldsWithBoosts = [];
-        
+
         foreach ($fields as $key => $value) {
             if (is_string($key)) {
                 // Associative array with field => boost
@@ -983,7 +984,7 @@ class ElasticsearchService extends Component
                 }
             }
         }
-        
+
         return $fieldsWithBoosts;
     }
 
