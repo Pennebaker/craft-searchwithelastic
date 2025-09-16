@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.1.1] - 2025-09-16
+
+### Fixed
+- Parse environment variables for Elasticsearch endpoint and credentials in services
+
 ## [4.1.0] - 2025-09-15
 
 ### Added
@@ -23,6 +28,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial release of Search w/Elastic plugin for Craft CMS
 
-[Unreleased]: https://github.com/pennebaker/craft-searchwithelastic/compare/4.1.0...craft-4
+[Unreleased]: https://github.com/pennebaker/craft-searchwithelastic/compare/4.1.1...craft-4
+[4.1.1]: https://github.com/pennebaker/craft-searchwithelastic/compare/4.1.0...4.1.1
 [4.1.0]: https://github.com/pennebaker/craft-searchwithelastic/compare/4.0.0...4.1.0
 [4.0.0]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/4.0.0
