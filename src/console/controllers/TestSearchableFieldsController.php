@@ -444,7 +444,7 @@ class TestSearchableFieldsController extends Controller
                             if (is_array($fieldData)) {
                                 
                                 // Check if this is a nested SuperTable field (it may not be marked searchable itself)
-                                if (isset($fieldData['structured_type']) && $fieldData['structured_type'] === 'supertable' && isset($fieldData['value'])) {
+                                if (isset($fieldData['field_type']) && str_contains($fieldData['field_type'], 'supertable\\fields\\SuperTableField') && isset($fieldData['value'])) {
                                     // Format nested SuperTable as a table
                                     $nestedTableContent = $this->extractBlockContent($fieldData['value']);
                                     if (!empty($nestedTableContent)) {

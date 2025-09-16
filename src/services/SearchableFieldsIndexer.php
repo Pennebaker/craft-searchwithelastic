@@ -286,47 +286,38 @@ class SearchableFieldsIndexer extends Component
         switch (true) {
             case $field instanceof AssetsField:
                 $baseData['value'] = $this->transformAssetField($value);
-                $baseData['structured_type'] = 'assets';
                 break;
                 
             case $field instanceof EntriesField:
                 $baseData['value'] = $this->transformEntriesField($value);
-                $baseData['structured_type'] = 'entries';
                 break;
                 
             case $field instanceof CategoriesField:
                 $baseData['value'] = $this->transformCategoriesField($value);
-                $baseData['structured_type'] = 'categories';
                 break;
                 
             case $field instanceof TagsField:
                 $baseData['value'] = $this->transformTagsField($value);
-                $baseData['structured_type'] = 'tags';
                 break;
                 
             case $field instanceof UsersField:
                 $baseData['value'] = $this->transformUsersField($value);
-                $baseData['structured_type'] = 'users';
                 break;
                 
             case $field instanceof MatrixField:
                 $baseData['value'] = $this->transformMatrixField($value, $element);
-                $baseData['structured_type'] = 'matrix';
                 break;
                 
             case class_exists('\\benf\\neo\\Field') && $field instanceof \benf\neo\Field:
                 $baseData['value'] = $this->transformNeoField($value, $element);
-                $baseData['structured_type'] = 'neo';
                 break;
                 
             case $field instanceof TableField:
                 $baseData['value'] = $this->transformTableField($value);
-                $baseData['structured_type'] = 'table';
                 break;
                 
             case class_exists('\\verbb\\tablemaker\\fields\\TableMakerField') && $field instanceof \verbb\tablemaker\fields\TableMakerField:
                 $baseData['value'] = $this->transformTableMakerField($value);
-                $baseData['structured_type'] = 'tablemaker';
                 // Override keywords to only include row content, not column metadata
                 if (!empty($baseData['value']['rows'])) {
                     $keywords = [];
@@ -343,12 +334,10 @@ class SearchableFieldsIndexer extends Component
                 
             case class_exists('\\verbb\\supertable\\fields\\SuperTableField') && $field instanceof \verbb\supertable\fields\SuperTableField:
                 $baseData['value'] = $this->transformSuperTableField($value, $element);
-                $baseData['structured_type'] = 'supertable';
                 break;
                 
             case $field instanceof CountryField:
                 $baseData['value'] = $this->transformCountryField($value, $field);
-                $baseData['structured_type'] = 'country';
                 // Include both code and label in keywords
                 if (!empty($baseData['value'])) {
                     $keywords = [];
@@ -365,7 +354,6 @@ class SearchableFieldsIndexer extends Component
             case $field instanceof DateField:
             case $field instanceof TimeField:
                 $baseData['value'] = $this->transformDateTimeField($value);
-                $baseData['structured_type'] = $field instanceof DateField ? 'date' : 'time';
                 // Ensure keywords are set for date/time fields
                 if (empty($baseData['keywords']) && !empty($baseData['value'])) {
                     $baseData['keywords'] = $baseData['value'];
@@ -374,7 +362,6 @@ class SearchableFieldsIndexer extends Component
                 
             case $field instanceof MoneyField:
                 $baseData['value'] = $this->transformMoneyField($value);
-                $baseData['structured_type'] = 'money';
                 // Ensure keywords are set for money fields
                 if (empty($baseData['keywords']) && !empty($baseData['value'])) {
                     $keywords = [];
@@ -392,7 +379,6 @@ class SearchableFieldsIndexer extends Component
                 
             default:
                 $baseData['value'] = $this->serializeValue($value);
-                $baseData['structured_type'] = 'simple';
                 break;
         }
         
@@ -1012,9 +998,6 @@ class SearchableFieldsIndexer extends Component
                 ],
                 'searchable' => [
                     'type' => 'boolean'
-                ],
-                'structured_type' => [
-                    'type' => 'keyword'
                 ]
             ]
         ];
