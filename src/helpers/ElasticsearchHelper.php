@@ -686,7 +686,7 @@ class ElasticsearchHelper
             'value' => function (ElementInterface $element) {
                 $entry = Craft::$app->entries->getEntryById($element->id);
                 if ($entry) {
-                    return $entry->section->handle . '_' . $entry->type->handle . '_Entry';
+                    return $entry->type->handle . '_Entry';
                 }
                 return null;
             }
