@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [5.1.2] - 2025-12-30
+### Fixed
+- Fixed null section access during indexing to prevent “Attempt to read property 'type' on null” when saving entries.
+
 ## [5.1.1] - 2025-11-19
 
 ### Fixed
@@ -16,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial release of Search w/Elastic plugin for Craft CMS 5
 
-[Unreleased]: https://github.com/pennebaker/craft-searchwithelastic/compare/5.1.1...craft-5
+[Unreleased]: https://github.com/pennebaker/craft-searchwithelastic/compare/5.1.2...craft-5
+[5.1.2]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.1.2
 [5.1.1]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.1.1
 [5.1.0]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.1.0
