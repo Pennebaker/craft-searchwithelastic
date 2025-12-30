@@ -532,7 +532,7 @@ class ElementIndexerService extends Component
                 $document['expiryDate'] = $element->expiryDate?->format('c');
 
                 // Add entry order for structure sections
-                if ($element->section->type === 'structure') {
+                if ($element->section && $element->section->type === 'structure') {
                     // Get the position of this entry in the structure
                     $document['order'] = (int) Entry::find()
                         ->drafts(false)
