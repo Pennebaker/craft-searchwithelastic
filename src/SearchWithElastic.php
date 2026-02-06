@@ -323,29 +323,11 @@ class SearchWithElastic extends Plugin
         // Get the settings that are being defined by the config file
         $overrides = Craft::$app->getConfig()->getConfigFromFile(strtolower($this->handle));
 
-//        $sections = ArrayHelper::map(
-//            Craft::$app->sections->getAllSections(),
-//            'id',
-//            static function (Section $section): array {
-//                return [
-//                    'label' => Craft::t('site', $section->name),
-//                    'types' => ArrayHelper::map(
-//                        $section->getEntryTypes(),
-//                        'id',
-//                        static function ($section): array {
-//                            return ['label' => Craft::t('site', $section->name)];
-//                        }
-//                    ),
-//                ];
-//            }
-//        );
-
         return Craft::$app->view->renderTemplate(
             'search-with-elastic/cp/settings',
             [
                 'settings'  => $settings,
                 'overrides' => array_keys($overrides),
-//                'sections'  => $sections,
             ]
         );
     }
