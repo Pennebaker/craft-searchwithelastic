@@ -79,7 +79,7 @@ class RateLimitBehavior extends Behavior
             return;
         }
 
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Use plugin settings if enabled and configured to do so
         if ($this->usePluginSettings && $settings->rateLimitingEnabled) {
@@ -120,7 +120,7 @@ class RateLimitBehavior extends Behavior
             return;
         }
 
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         if ($this->usePluginSettings && $settings->rateLimitingEnabled) {
             $rateLimiter = SearchWithElastic::getInstance()->rateLimiter;
@@ -194,7 +194,7 @@ class RateLimitBehavior extends Behavior
      */
     private function getIdentifier(): string
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $request = Craft::$app->getRequest();
 
         // Use plugin settings for tracking method if available

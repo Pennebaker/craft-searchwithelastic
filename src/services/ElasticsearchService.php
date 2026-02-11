@@ -53,7 +53,7 @@ class ElasticsearchService extends Component
      */
     public function testConnection(): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Fire a 'beforeConnectionTest' event
         $event = new ConnectionTestEvent([
@@ -158,7 +158,7 @@ class ElasticsearchService extends Component
      */
     protected function isPartialIndex(Element $element, object $record): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Only check if frontend fetching is enabled
         if (!$settings->enableFrontendFetching) {
@@ -381,7 +381,7 @@ class ElasticsearchService extends Component
             }
 
             // Get highlight settings from plugin configuration
-            $settings = SearchWithElastic::getInstance()->getSettings();
+            $settings = SearchWithElastic::getPluginSettings();
 
             // Check if we got template parameters or a direct query
             if (isset($queryResult['template_id']) && isset($queryResult['params'])) {

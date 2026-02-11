@@ -60,7 +60,7 @@ class RateLimiterService extends Component
      */
     public function allowRequest(?string $identifier = null): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Skip if rate limiting is disabled
         if (!$settings->rateLimitingEnabled) {
@@ -124,7 +124,7 @@ class RateLimiterService extends Component
      */
     public function getRetryAfter(?string $identifier = null): int
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         
         // Calculate seconds per token
         $secondsPerToken = 60 / $settings->rateLimitRequestsPerMinute;
@@ -141,7 +141,7 @@ class RateLimiterService extends Component
      */
     public function getRemainingTokens(?string $identifier = null): int
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         if (!$settings->rateLimitingEnabled) {
             return PHP_INT_MAX;
@@ -191,7 +191,7 @@ class RateLimiterService extends Component
      */
     private function getIdentifier(): string
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $request = Craft::$app->getRequest();
 
         if ($settings->rateLimitTrackingMethod === 'user') {
@@ -213,7 +213,7 @@ class RateLimiterService extends Component
      */
     private function isExempt(string $identifier): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Extract IP from identifier if it's an IP-based identifier
         if (str_starts_with($identifier, 'ip_')) {
@@ -272,7 +272,7 @@ class RateLimiterService extends Component
      */
     private function getBucket(string $identifier): array
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $cacheKey = $this->getCacheKey($identifier);
         
         $bucket = $this->cache->get($cacheKey);

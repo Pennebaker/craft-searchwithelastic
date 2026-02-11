@@ -219,7 +219,21 @@ return [
     // 'rateLimitExemptIps' => ['127.0.0.1', '::1'], // Exempt localhost
     // 'rateLimitExemptIps' => ['192.168.1.0/24'], // Exempt internal network
     // 'rateLimitExemptIps' => ['$TRUSTED_IP_1', '$TRUSTED_IP_2'], // Use environment variables
-    
+
+    // Dependent Re-indexing Configuration
+    // Re-index elements that reference a saved element via relational fields
+    'enableRelationalReindexing' => false, // Default: disabled
+    // 'enableRelationalReindexing' => true, // Re-index elements that reference a saved element via relational fields
+
+    // Re-index sibling entries when an entry moves position in a structure section
+    'enableStructureReindexing' => false, // Default: disabled
+    // 'enableStructureReindexing' => true, // Enable to keep structure order fields up-to-date after moves
+
+    // Maximum number of dependent re-index jobs queued per triggering event
+    'dependentReindexBatchLimit' => 100, // Default: cap at 100 jobs per event
+    // 'dependentReindexBatchLimit' => 50, // More conservative for high-traffic sites
+    // 'dependentReindexBatchLimit' => 500, // Higher limit for sites with many relations
+
     // SECURITY NOTES:
     // - Always use environment variables for sensitive credentials
     // - Environment variables are parsed using Craft's built-in parsing

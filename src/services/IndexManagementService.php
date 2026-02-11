@@ -48,7 +48,7 @@ class IndexManagementService extends Component
      */
     public function getIndexName(int $siteId, ?string $elementType = null): string
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Start with the configured prefix (e.g., 'craft-')
         $indexName = $settings->indexPrefix;
@@ -77,7 +77,7 @@ class IndexManagementService extends Component
      */
     public function getAllIndexNames(int $siteId): array
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $indexNames = [];
 
         // Always include the fallback index
@@ -322,7 +322,7 @@ class IndexManagementService extends Component
      */
     protected function addExtraFieldsMappings(array &$config, string $analyzer): void
     {
-        $extraFields = SearchWithElastic::getInstance()->getSettings()->extraFields;
+        $extraFields = SearchWithElastic::getPluginSettings()->extraFields;
         if (!empty($extraFields)) {
             foreach ($extraFields as $fieldName => $fieldParams) {
                 $fieldMapping = ArrayHelper::getValue($fieldParams, 'mapping');
@@ -369,7 +369,7 @@ class IndexManagementService extends Component
      */
     private function buildDynamicMappingProperties(string $analyzer): array
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Start with base mappings that apply to all element types
         $properties = [
@@ -483,7 +483,7 @@ class IndexManagementService extends Component
      */
     private function isElementTypeIndexed(string $elementClass): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Check based on element type and settings
         switch ($elementClass) {
@@ -574,7 +574,7 @@ class IndexManagementService extends Component
      */
     private function isFieldUsedInExtraFields(string $fieldName): bool
     {
-        $extraFields = SearchWithElastic::getInstance()->getSettings()->extraFields ?? [];
+        $extraFields = SearchWithElastic::getPluginSettings()->extraFields ?? [];
         return isset($extraFields[$fieldName]);
     }
 
@@ -586,7 +586,7 @@ class IndexManagementService extends Component
      */
     private function hasStructureSections(): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $sections = \Craft::$app->entries->getAllSections();
 
         foreach ($sections as $section) {

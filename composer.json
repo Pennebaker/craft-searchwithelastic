@@ -25,14 +25,17 @@
     "require": {
         "ext-curl": "*",
         "ext-dom": "*",
-        "craftcms/cms": "^5.0.0",
-        "yiisoft/yii2-elasticsearch": "^2.1.0"
+        "craftcms/cms": "^5.9",
+        "yiisoft/yii2-elasticsearch": "^2.1"
     },
     "require-dev": {
         "craftcms/commerce": "^5.0",
         "craftcms/digital-products": "^4.0"
     },
     "config": {
+        "platform": {
+            "php": "8.2"
+        },
         "allow-plugins": {
             "craftcms/plugin-installer": true,
             "yiisoft/yii2-composer": true
@@ -50,7 +53,7 @@
         "name": "Search with Elastic",
         "handle": "search-with-elastic",
         "schemaVersion": "4.0.0",
-        "changelogUrl": "https://raw.githubusercontent.com/pennebaker/craft-searchwithelastic/master/CHANGELOG.md",
+        "changelogUrl": "https://raw.githubusercontent.com/Pennebaker/craft-searchwithelastic/refs/heads/craft-5/CHANGELOG.md",
         "class": "pennebaker\\searchwithelastic\\SearchWithElastic"
     }
 }

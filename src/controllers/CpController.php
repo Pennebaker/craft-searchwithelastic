@@ -109,7 +109,7 @@ class CpController extends Controller
         $searchWithElasticPlugin = SearchWithElastic::getInstance();
         assert($searchWithElasticPlugin !== null, "SearchWithElastic::getInstance() should always return the plugin instance when called from the plugin's code.");
 
-        $settings = $searchWithElasticPlugin->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         if ($searchWithElasticPlugin->elasticsearch->testConnection() === true) {
             Craft::$app->session->setNotice(
@@ -330,7 +330,7 @@ class CpController extends Controller
                 }
 
                 if ($result->isPartial()) {
-                    $settings = SearchWithElastic::getInstance()->getSettings();
+                    $settings = SearchWithElastic::getPluginSettings();
                     $response = [
                         'success' => true,
                         'status' => $result->status,
@@ -563,7 +563,7 @@ class CpController extends Controller
         }
 
         // Check if element type is disabled
-        $settings = $plugin->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $disabledType = false;
 
         switch (get_class($element)) {
@@ -850,7 +850,7 @@ class CpController extends Controller
             }
 
             if ($result->isPartial()) {
-                $settings = $SearchWithElastic->getSettings();
+                $settings = SearchWithElastic::getPluginSettings();
                 $response = [
                     'status' => 'partial',
                     'reason' => $result->reason,

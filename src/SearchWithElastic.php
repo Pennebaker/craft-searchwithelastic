@@ -20,20 +20,20 @@ use craft\digitalproducts\elements\Product as DigitalProduct;
 use craft\elements\Asset;
 use craft\elements\Category;
 use craft\elements\Entry;
+use craft\elements\Tag;
 use craft\errors\MissingComponentException;
 use craft\events\DefineHtmlEvent;
 use craft\events\ModelEvent;
+use craft\events\MoveElementEvent;
 use craft\events\PluginEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\helpers\App;
-use craft\helpers\ArrayHelper;
-use craft\helpers\ElementHelper;
 use craft\i18n\Locale;
-use craft\models\Section;
 use craft\queue\Queue;
 use craft\services\Plugins;
+use craft\services\Structures;
 use craft\services\UserPermissions;
 use craft\services\Utilities;
 use craft\web\Application;
@@ -47,6 +47,7 @@ use pennebaker\searchwithelastic\exceptions\IndexingException;
 use pennebaker\searchwithelastic\helpers\ElasticsearchHelper;
 use pennebaker\searchwithelastic\models\SettingsModel;
 use pennebaker\searchwithelastic\services\CallbackValidator;
+use pennebaker\searchwithelastic\services\DependentReindexService;
 use pennebaker\searchwithelastic\services\ElasticsearchService;
 use pennebaker\searchwithelastic\services\ElementIndexerService;
 use pennebaker\searchwithelastic\services\IndexManagementService;
@@ -63,6 +64,8 @@ use Twig\Error\LoaderError;
 use Twig\Error\RuntimeError;
 use Twig\Error\SyntaxError;
 use yii\base\Event;
+use craft\events\ElementEvent;
+use craft\services\Elements;
 use yii\base\InvalidConfigException;
 use yii\debug\Module as DebugModule;
 use yii\elasticsearch\Connection;
@@ -86,6 +89,7 @@ use yii\queue\ExecEvent;
  * @property  services\SearchTemplateService searchTemplates
  * @property  services\CallbackValidator callbackValidator
  * @property  services\SearchableFieldsIndexer searchableFieldsIndexer
+ * @property  services\DependentReindexService dependentReindex
  * @property  SettingsModel settings
  * @property-read array $textBasedAssetKinds
  * @property-read array $allAssetKinds
@@ -133,6 +137,7 @@ class SearchWithElastic extends Plugin
                 'searchTemplates'               => SearchTemplateService::class,
                 'callbackValidator'             => CallbackValidator::class,
                 'searchableFieldsIndexer'       => SearchableFieldsIndexer::class,
+                'dependentReindex'              => DependentReindexService::class,
             ]
         );
 
@@ -161,6 +166,19 @@ class SearchWithElastic extends Plugin
                     Event::on(DigitalProduct::class, DigitalProduct::EVENT_AFTER_SAVE, [$this, 'onElementSaved']);
                     Event::on(DigitalProduct::class, DigitalProduct::EVENT_AFTER_DELETE, [$this, 'onElementDelete']);
                 }
+            }
+
+            // Dependent re-indexing event listeners
+            $settings = $this->getSettings();
+
+            // Relational re-indexing: re-index elements that reference a saved element via relational fields
+            if ($settings->enableRelationalReindexing) {
+                Event::on(Elements::class, Elements::EVENT_AFTER_SAVE_ELEMENT, [$this, 'onElementAfterSaveForRelations']);
+            }
+
+            if ($settings->enableStructureReindexing) {
+                Event::on(Structures::class, Structures::EVENT_AFTER_UPDATE_ELEMENT, [$this, 'onStructureElementMoved']);
+                Event::on(Structures::class, Structures::EVENT_AFTER_INSERT_ELEMENT, [$this, 'onStructureElementMoved']);
             }
 
             // Add the sidebar status to the entry, asset, and category edit pages
@@ -353,6 +371,23 @@ class SearchWithElastic extends Plugin
         $connection = Craft::$app->get(self::PLUGIN_HANDLE);
 
         return $connection;
+    }
+
+    /**
+     * Returns the plugin settings with null-safe instance access.
+     *
+     * Provides a single standardized way to access plugin settings from
+     * anywhere in the codebase without repeating null checks on getInstance().
+     *
+     * @return SettingsModel
+     * @since 5.2.0
+     */
+    public static function getPluginSettings(): SettingsModel
+    {
+        $instance = self::getInstance();
+        assert($instance !== null, 'SearchWithElastic plugin must be installed and enabled.');
+
+        return $instance->getSettings();
     }
 
     /**
@@ -596,6 +631,45 @@ class SearchWithElastic extends Plugin
         /** @var Element $element */
         $element = $event->sender;
         $this->elementIndexer->deleteElement($element);
+    }
+
+    /**
+     * Handle element after save to re-index elements that reference this element
+     *
+     * @param ElementEvent $event The element event
+     * @since 5.2.0
+     */
+    public function onElementAfterSaveForRelations(ElementEvent $event): void
+    {
+        /** @var Element $element */
+        $element = $event->element;
+
+        if ($element instanceof Entry || $element instanceof Category || $element instanceof Asset || $element instanceof Tag) {
+            if (!ElasticsearchHelper::shouldSkipIndexing($element)) {
+                $this->dependentReindex->handleRelatedReindexing($element);
+            }
+        }
+    }
+
+    /**
+     * Handle structure element move/insert to re-index siblings in the structure
+     *
+     * @param MoveElementEvent $event The move element event
+     * @since 5.2.0
+     */
+    public function onStructureElementMoved(MoveElementEvent $event): void
+    {
+        $element = $event->element;
+
+        Craft::info('Structure element moved/inserted: ' . get_class($element) . ' with ID ' . $element->id, __METHOD__);
+
+        if (!$element instanceof Element) {
+            return;
+        }
+
+        if (!ElasticsearchHelper::shouldSkipIndexing($element)) {
+            $this->dependentReindex->handleStructureReindexing($element);
+        }
     }
 
     /**

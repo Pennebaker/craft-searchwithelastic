@@ -25,7 +25,7 @@ class ElasticsearchDirectService extends Component
     public static function search(array $params): array
     {
         try {
-            $settings = \pennebaker\searchwithelastic\SearchWithElastic::getInstance()->getSettings();
+            $settings = \pennebaker\searchwithelastic\SearchWithElastic::getPluginSettings();
 
             // Build the URL - parse environment variables
             $endpoint = App::parseEnv($settings->elasticsearchEndpoint);

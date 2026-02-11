@@ -496,7 +496,7 @@ class ElasticsearchRecord extends ActiveRecord
     {
         if (is_null($this->_highlightParams)) {
             $this->_highlightParams = ArrayHelper::merge(
-                SearchWithElastic::getInstance()->settings->highlight,
+                SearchWithElastic::getPluginSettings()->highlight,
                 [
                     'fields' => [
                         'attachment.content' => (object)[],
@@ -566,11 +566,7 @@ class ElasticsearchRecord extends ActiveRecord
      */
     private function getPluginSettings(): SettingsModel
     {
-        $instance = SearchWithElastic::getInstance();
-        if (!$instance instanceof SearchWithElastic) {
-            throw new InvalidConfigException('SearchWithElastic instance not found');
-        }
-        return $instance->getSettings();
+        return SearchWithElastic::getPluginSettings();
     }
 
     /**

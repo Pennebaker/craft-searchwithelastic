@@ -32,10 +32,8 @@ use craft\fields\Table as TableField;
 use craft\fields\Tags as TagsField;
 use craft\fields\Time as TimeField;
 use craft\fields\Users as UsersField;
-use craft\helpers\ElementHelper;
 use pennebaker\searchwithelastic\events\SearchableFieldExtractionEvent;
 use pennebaker\searchwithelastic\events\FieldDataTransformEvent;
-use pennebaker\searchwithelastic\SearchWithElastic;
 use yii\base\Event;
 
 /**
@@ -54,13 +52,13 @@ class SearchableFieldsIndexer extends Component
      * @since 4.0.0
      */
     const EVENT_BEFORE_EXTRACT_FIELDS = 'beforeExtractFields';
-    
+
     /**
      * @event SearchableFieldExtractionEvent Triggered after extracting searchable fields
      * @since 4.0.0
      */
     const EVENT_AFTER_EXTRACT_FIELDS = 'afterExtractFields';
-    
+
     /**
      * @event FieldDataTransformEvent Triggered when transforming field data
      * @since 4.0.0
@@ -78,10 +76,10 @@ class SearchableFieldsIndexer extends Component
     public function extractSearchableFields(ElementInterface $element, array $config = []): array
     {
         $searchableData = [];
-        
+
         // Get field layout for the element
         $fieldLayout = $element->getFieldLayout();
-        
+
         if (!$fieldLayout) {
             Craft::info(
                 "No field layout found for element {$element->id}",
@@ -89,7 +87,7 @@ class SearchableFieldsIndexer extends Component
             );
             return $searchableData;
         }
-        
+
         // Fire before extract event
         if ($this->hasEventHandlers(self::EVENT_BEFORE_EXTRACT_FIELDS)) {
             $event = new SearchableFieldExtractionEvent([
@@ -98,23 +96,23 @@ class SearchableFieldsIndexer extends Component
                 'config' => $config
             ]);
             $this->trigger(self::EVENT_BEFORE_EXTRACT_FIELDS, $event);
-            
+
             // Allow event to override extraction
             if ($event->isValid === false) {
                 return $event->fields;
             }
         }
-        
+
         // Extract native element attributes
         $searchableData = array_merge(
             $searchableData,
             $this->extractElementAttributes($element)
         );
-        
+
         // Extract custom searchable fields
         $customFields = $this->extractCustomFields($element, $fieldLayout, $config);
         $searchableData = array_merge($searchableData, $customFields);
-        
+
         // Fire after extract event
         if ($this->hasEventHandlers(self::EVENT_AFTER_EXTRACT_FIELDS)) {
             $event = new SearchableFieldExtractionEvent([
@@ -125,10 +123,10 @@ class SearchableFieldsIndexer extends Component
             $this->trigger(self::EVENT_AFTER_EXTRACT_FIELDS, $event);
             $searchableData = $event->fields;
         }
-        
+
         return $searchableData;
     }
-    
+
     /**
      * Extract native element attributes
      *
@@ -139,10 +137,10 @@ class SearchableFieldsIndexer extends Component
     protected function extractElementAttributes(ElementInterface $element): array
     {
         $attributes = [];
-        
+
         // Get searchable attributes defined by the element type
         $searchableAttributes = $element::searchableAttributes();
-        
+
         foreach ($searchableAttributes as $attribute) {
             try {
                 $value = $element->$attribute;
@@ -161,10 +159,10 @@ class SearchableFieldsIndexer extends Component
                 );
             }
         }
-        
+
         return $attributes;
     }
-    
+
     /**
      * Extract custom searchable fields
      *
@@ -177,7 +175,7 @@ class SearchableFieldsIndexer extends Component
     protected function extractCustomFields(ElementInterface $element, $fieldLayout, array $config = []): array
     {
         $fields = [];
-        
+
         foreach ($fieldLayout->getCustomFields() as $field) {
             // Special handling for Matrix, Neo, and SuperTable fields - always process them to check sub-fields
             $isNeoField = class_exists('\\benf\\neo\\Field') && $field instanceof \benf\neo\Field;
@@ -198,12 +196,12 @@ class SearchableFieldsIndexer extends Component
                 }
                 continue;
             }
-            
+
             // For non-Matrix fields, check searchable flag
             if (!$field->searchable) {
                 continue;
             }
-            
+
             try {
                 $fieldData = $this->extractFieldData($element, $field);
                 if ($fieldData !== null) {
@@ -216,10 +214,10 @@ class SearchableFieldsIndexer extends Component
                 );
             }
         }
-        
+
         return $fields;
     }
-    
+
     /**
      * Extract data from a single field
      *
@@ -232,20 +230,20 @@ class SearchableFieldsIndexer extends Component
     {
         // Get raw field value
         $value = $element->getFieldValue($field->handle);
-        
+
         if ($value === null) {
             return null;
         }
-        
+
         // Get search keywords using Craft's built-in extraction
         $keywords = '';
         if ($field->searchable) {
             $keywords = $field->getSearchKeywords($value, $element);
         }
-        
+
         // Transform based on field type
         $transformedData = $this->transformFieldData($field, $value, $keywords, $element);
-        
+
         // Fire transform event
         if ($this->hasEventHandlers(self::EVENT_TRANSFORM_FIELD_DATA)) {
             $event = new FieldDataTransformEvent([
@@ -258,10 +256,10 @@ class SearchableFieldsIndexer extends Component
             $this->trigger(self::EVENT_TRANSFORM_FIELD_DATA, $event);
             $transformedData = $event->transformedData;
         }
-        
+
         return $transformedData;
     }
-    
+
     /**
      * Transform field data for Elasticsearch
      *
@@ -281,41 +279,41 @@ class SearchableFieldsIndexer extends Component
             'field_name' => $field->name,
             'searchable' => $field->searchable
         ];
-        
+
         // Handle different field types
         switch (true) {
             case $field instanceof AssetsField:
                 $baseData['value'] = $this->transformAssetField($value);
                 break;
-                
+
             case $field instanceof EntriesField:
                 $baseData['value'] = $this->transformEntriesField($value);
                 break;
-                
+
             case $field instanceof CategoriesField:
                 $baseData['value'] = $this->transformCategoriesField($value);
                 break;
-                
+
             case $field instanceof TagsField:
                 $baseData['value'] = $this->transformTagsField($value);
                 break;
-                
+
             case $field instanceof UsersField:
                 $baseData['value'] = $this->transformUsersField($value);
                 break;
-                
+
             case $field instanceof MatrixField:
                 $baseData['value'] = $this->transformMatrixField($value, $element);
                 break;
-                
+
             case class_exists('\\benf\\neo\\Field') && $field instanceof \benf\neo\Field:
                 $baseData['value'] = $this->transformNeoField($value, $element);
                 break;
-                
+
             case $field instanceof TableField:
                 $baseData['value'] = $this->transformTableField($value);
                 break;
-                
+
             case class_exists('\\verbb\\tablemaker\\fields\\TableMakerField') && $field instanceof \verbb\tablemaker\fields\TableMakerField:
                 $baseData['value'] = $this->transformTableMakerField($value);
                 // Override keywords to only include row content, not column metadata
@@ -331,11 +329,11 @@ class SearchableFieldsIndexer extends Component
                     $baseData['keywords'] = implode(' ', $keywords);
                 }
                 break;
-                
+
             case class_exists('\\verbb\\supertable\\fields\\SuperTableField') && $field instanceof \verbb\supertable\fields\SuperTableField:
                 $baseData['value'] = $this->transformSuperTableField($value, $element);
                 break;
-                
+
             case $field instanceof CountryField:
                 $baseData['value'] = $this->transformCountryField($value, $field);
                 // Include both code and label in keywords
@@ -350,7 +348,7 @@ class SearchableFieldsIndexer extends Component
                     $baseData['keywords'] = implode(' ', $keywords);
                 }
                 break;
-                
+
             case $field instanceof DateField:
             case $field instanceof TimeField:
                 $baseData['value'] = $this->transformDateTimeField($value);
@@ -359,7 +357,7 @@ class SearchableFieldsIndexer extends Component
                     $baseData['keywords'] = $baseData['value'];
                 }
                 break;
-                
+
             case $field instanceof MoneyField:
                 $baseData['value'] = $this->transformMoneyField($value);
                 // Ensure keywords are set for money fields
@@ -376,15 +374,15 @@ class SearchableFieldsIndexer extends Component
                     $baseData['keywords'] = implode(' ', $keywords);
                 }
                 break;
-                
+
             default:
                 $baseData['value'] = $this->serializeValue($value);
                 break;
         }
-        
+
         return $baseData;
     }
-    
+
     /**
      * Transform asset field value
      *
@@ -397,7 +395,7 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $assets = [];
         foreach ($value->all() as $asset) {
             if ($asset instanceof Asset) {
@@ -414,10 +412,10 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         return $assets;
     }
-    
+
     /**
      * Transform entries field value
      *
@@ -430,7 +428,7 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $entries = [];
         foreach ($value->all() as $entry) {
             if ($entry instanceof Entry) {
@@ -444,10 +442,10 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         return $entries;
     }
-    
+
     /**
      * Transform categories field value
      *
@@ -460,7 +458,7 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $categories = [];
         foreach ($value->all() as $category) {
             if ($category instanceof Category) {
@@ -473,10 +471,10 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         return $categories;
     }
-    
+
     /**
      * Transform tags field value
      *
@@ -489,7 +487,7 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $tags = [];
         foreach ($value->all() as $tag) {
             if ($tag instanceof Tag) {
@@ -501,10 +499,10 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         return $tags;
     }
-    
+
     /**
      * Transform users field value
      *
@@ -517,7 +515,7 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $users = [];
         foreach ($value->all() as $user) {
             if ($user instanceof User) {
@@ -531,10 +529,10 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         return $users;
     }
-    
+
     /**
      * Transform matrix field value
      *
@@ -548,28 +546,28 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $blocks = [];
         $hasSearchableContent = false;
-        
+
         foreach ($value->all() as $block) {
             $blockData = [
                 'id' => $block->id,
                 'typeHandle' => $block->type->handle,
                 'fields' => []
             ];
-            
+
             // Recursively extract fields from matrix blocks
             $blockFieldLayout = $block->getFieldLayout();
             if ($blockFieldLayout) {
                 foreach ($blockFieldLayout->getCustomFields() as $blockField) {
                     // Check if this is a SuperTable field (always process to check sub-fields)
                     $isSuperTableField = class_exists('\\verbb\\supertable\\fields\\SuperTableField') && $blockField instanceof \verbb\supertable\fields\SuperTableField;
-                    
+
                     // Process if searchable OR if it's a SuperTable field (which may contain searchable sub-fields)
                     if ($blockField->searchable || $isSuperTableField) {
                         $blockFieldData = $this->extractFieldData($block, $blockField);
-                        
+
                         if ($blockFieldData !== null && (!empty($blockFieldData['value']) || !empty($blockFieldData['keywords']))) {
                             $blockData['fields'][$blockField->handle] = $blockFieldData;
                             $hasSearchableContent = true;
@@ -577,17 +575,17 @@ class SearchableFieldsIndexer extends Component
                     }
                 }
             }
-            
+
             // Only include block if it has searchable fields
             if (!empty($blockData['fields'])) {
                 $blocks[] = $blockData;
             }
         }
-        
+
         // Return null if no searchable content was found
         return $hasSearchableContent ? $blocks : null;
     }
-    
+
     /**
      * Transform Neo field value
      *
@@ -601,30 +599,30 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $blocks = [];
         $hasSearchableContent = false;
-        
+
         foreach ($value->all() as $block) {
             $blockData = [
                 'id' => $block->id,
                 'level' => $block->level ?? 1,
                 'fields' => []
             ];
-            
+
             // Get type handle (Neo blocks have a getType() method)
             if (method_exists($block, 'getType')) {
                 $blockType = $block->getType();
                 $blockData['typeHandle'] = $blockType ? $blockType->handle : null;
             }
-            
+
             // Recursively extract fields from Neo blocks
             $blockFieldLayout = $block->getFieldLayout();
             if ($blockFieldLayout) {
                 foreach ($blockFieldLayout->getCustomFields() as $blockField) {
                     // Check if this is a SuperTable field (always process to check sub-fields)
                     $isSuperTableField = class_exists('\\verbb\\supertable\\fields\\SuperTableField') && $blockField instanceof \verbb\supertable\fields\SuperTableField;
-                    
+
                     // Process if searchable OR if it's a SuperTable field (which may contain searchable sub-fields)
                     if ($blockField->searchable || $isSuperTableField) {
                         $blockFieldData = $this->extractFieldData($block, $blockField);
@@ -635,17 +633,17 @@ class SearchableFieldsIndexer extends Component
                     }
                 }
             }
-            
+
             // Only include block if it has searchable fields
             if (!empty($blockData['fields'])) {
                 $blocks[] = $blockData;
             }
         }
-        
+
         // Return null if no searchable content was found
         return $hasSearchableContent ? $blocks : null;
     }
-    
+
     /**
      * Transform table field value
      *
@@ -658,7 +656,7 @@ class SearchableFieldsIndexer extends Component
         if (!is_array($value)) {
             return null;
         }
-        
+
         $rows = [];
         foreach ($value as $row) {
             if (is_array($row)) {
@@ -672,10 +670,10 @@ class SearchableFieldsIndexer extends Component
                 $rows[] = $rowData;
             }
         }
-        
+
         return $rows;
     }
-    
+
     /**
      * Transform TableMaker field value
      *
@@ -688,12 +686,12 @@ class SearchableFieldsIndexer extends Component
         if (!is_array($value)) {
             return null;
         }
-        
+
         $result = [
             'columns' => [],
             'rows' => []
         ];
-        
+
         // Extract column info (without width/align metadata for keywords)
         if (isset($value['columns']) && is_array($value['columns'])) {
             foreach ($value['columns'] as $column) {
@@ -702,7 +700,7 @@ class SearchableFieldsIndexer extends Component
                 }
             }
         }
-        
+
         // Extract row data
         if (isset($value['rows']) && is_array($value['rows'])) {
             foreach ($value['rows'] as $row) {
@@ -717,10 +715,10 @@ class SearchableFieldsIndexer extends Component
                 }
             }
         }
-        
+
         return !empty($result['rows']) ? $result : null;
     }
-    
+
     /**
      * Transform SuperTable field value
      *
@@ -734,16 +732,16 @@ class SearchableFieldsIndexer extends Component
         if (!$value instanceof ElementQuery) {
             return null;
         }
-        
+
         $rows = [];
         $hasSearchableContent = false;
-        
+
         foreach ($value->all() as $row) {
             $rowData = [
                 'id' => $row->id,
                 'fields' => []
             ];
-            
+
             // Recursively extract ONLY searchable fields from SuperTable rows
             $rowFieldLayout = $row->getFieldLayout();
             if ($rowFieldLayout) {
@@ -758,17 +756,17 @@ class SearchableFieldsIndexer extends Component
                     }
                 }
             }
-            
+
             // Only include row if it has searchable fields
             if (!empty($rowData['fields'])) {
                 $rows[] = $rowData;
             }
         }
-        
+
         // Return null if no searchable content was found
         return $hasSearchableContent ? $rows : null;
     }
-    
+
     /**
      * Transform country field value
      *
@@ -782,7 +780,7 @@ class SearchableFieldsIndexer extends Component
         if (empty($value)) {
             return null;
         }
-        
+
         // Handle Country object from Commerce
         if (is_object($value) && class_exists('\\CommerceGuys\\Addressing\\Country\\Country')) {
             if ($value instanceof \CommerceGuys\Addressing\Country\Country) {
@@ -792,21 +790,21 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         // Fallback for string values
         if (is_string($value)) {
             $countries = Craft::$app->getAddresses()->getCountryRepository()->getList(Craft::$app->language);
             $label = $countries[$value] ?? $value;
-            
+
             return [
                 'code' => $value,
                 'label' => $label
             ];
         }
-        
+
         return null;
     }
-    
+
     /**
      * Transform date/time field value
      *
@@ -819,10 +817,10 @@ class SearchableFieldsIndexer extends Component
         if ($value instanceof \DateTime) {
             return $value->format('c');
         }
-        
+
         return null;
     }
-    
+
     /**
      * Transform money field value
      *
@@ -836,36 +834,36 @@ class SearchableFieldsIndexer extends Component
         if ($value === null || $value === '') {
             return null;
         }
-        
+
         // Handle craft\fields\data\Money object
         if ($value instanceof \craft\fields\data\Money) {
             // Check if the Money object has a value
             if ($value->value === null || $value->value === '') {
                 return null;
             }
-            
+
             return [
                 'amount' => (string) $value->value,
                 'currency' => $value->currency ?? 'USD'
             ];
         }
-        
+
         // Handle Money\Money object (moneyphp/money library used by Craft)
         if (class_exists('\\Money\\Money') && $value instanceof \Money\Money) {
             // Get the currency code
             $currencyCode = $value->getCurrency()->getCode();
-            
+
             // Format the money value using Craft's formatter
             $formatter = Craft::$app->getFormatter();
             $formattedValue = $formatter->asCurrency($value->getAmount() / 100, $currencyCode);
-            
+
             return [
                 'amount' => (string) ($value->getAmount() / 100),  // Convert to decimal
                 'currency' => $currencyCode,
                 'formatted' => $formattedValue
             ];
         }
-        
+
         // Handle array format (in case it's stored differently)
         if (is_array($value)) {
             if (isset($value['value']) || isset($value['amount'])) {
@@ -875,7 +873,7 @@ class SearchableFieldsIndexer extends Component
                 ];
             }
         }
-        
+
         // Handle numeric values
         if (is_numeric($value)) {
             return [
@@ -883,10 +881,10 @@ class SearchableFieldsIndexer extends Component
                 'currency' => 'USD'
             ];
         }
-        
+
         return null;
     }
-    
+
     /**
      * Serialize a simple field value for storage
      *
@@ -908,14 +906,14 @@ class SearchableFieldsIndexer extends Component
             }
             return null;
         }
-        
+
         if (is_array($value)) {
             return array_map([$this, 'serializeValue'], $value);
         }
-        
+
         return $value;
     }
-    
+
     /**
      * Extract keywords from a value
      *
@@ -928,15 +926,15 @@ class SearchableFieldsIndexer extends Component
         if (is_string($value)) {
             return $value;
         }
-        
+
         if (is_numeric($value)) {
             return (string) $value;
         }
-        
+
         if (is_bool($value)) {
             return $value ? '1' : '0';
         }
-        
+
         if (is_array($value)) {
             $keywords = [];
             foreach ($value as $item) {
@@ -947,14 +945,14 @@ class SearchableFieldsIndexer extends Component
             }
             return implode(' ', $keywords);
         }
-        
+
         if (is_object($value) && method_exists($value, '__toString')) {
             return (string) $value;
         }
-        
+
         return '';
     }
-    
+
     /**
      * Get mapping configuration for Elasticsearch
      *
@@ -985,7 +983,7 @@ class SearchableFieldsIndexer extends Component
                 ]
             ]
         ];
-        
+
         // Add field-specific mapping for value
         switch (true) {
             case $field instanceof AssetsField:
@@ -999,13 +997,13 @@ class SearchableFieldsIndexer extends Component
                     'type' => 'nested'
                 ];
                 break;
-                
+
             case $field instanceof TableField:
                 $mapping['properties']['value'] = [
                     'type' => 'object'
                 ];
                 break;
-                
+
             default:
                 $mapping['properties']['value'] = [
                     'type' => 'text',
@@ -1018,7 +1016,7 @@ class SearchableFieldsIndexer extends Component
                 ];
                 break;
         }
-        
+
         return $mapping;
     }
 }

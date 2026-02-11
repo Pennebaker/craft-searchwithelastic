@@ -262,7 +262,7 @@ class IndexController extends Controller
         $this->stdout("Testing Elasticsearch connection...", Console::FG_YELLOW);
         $this->stdout(PHP_EOL);
 
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         if (SearchWithElastic::getInstance()->elasticsearch->testConnection()) {
             $this->stdout("✓ Successfully connected to {$settings->elasticsearchEndpoint}", Console::FG_GREEN);

@@ -116,7 +116,7 @@ class SearchVariable
      */
     public function getRateLimitStatus(): array
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         
         if (!$settings->rateLimitingEnabled) {
             return [
@@ -147,7 +147,7 @@ class SearchVariable
      */
     private function checkRateLimit(): void
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         
         if ($settings->rateLimitingEnabled) {
             $rateLimiter = SearchWithElastic::getInstance()->rateLimiter;

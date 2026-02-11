@@ -210,6 +210,15 @@ class SettingsModel extends Model
     /** @var array List of IP addresses exempt from rate limiting */
     public array $rateLimitExemptIps = [];
 
+    /** @var bool Whether to re-index elements when a related element's title changes */
+    public bool $enableRelationalReindexing = false;
+
+    /** @var bool Whether to re-index sibling entries when structure order changes */
+    public bool $enableStructureReindexing = false;
+
+    /** @var int Maximum number of dependent re-index jobs per triggering event */
+    public int $dependentReindexBatchLimit = 100;
+
     /**
      * @var array An associative array passed to the yii2-elasticsearch component Connection class constructor.
      * @note If this is set, the $elasticsearchEndpoint, $username, $password and $isAuthEnabled properties will be ignored.
@@ -289,6 +298,10 @@ class SettingsModel extends Model
             ['rateLimitTrackingMethod', 'default', 'value' => 'ip'],
             ['rateLimitExemptIps', 'each', 'rule' => ['ip', 'subnet' => null]],
             ['rateLimitExemptIps', 'default', 'value' => []],
+            ['enableRelationalReindexing', 'boolean'],
+            ['enableStructureReindexing', 'boolean'],
+            ['dependentReindexBatchLimit', 'integer', 'min' => 1, 'max' => 10000],
+            ['dependentReindexBatchLimit', 'default', 'value' => 100],
         ];
     }
 
@@ -346,6 +359,11 @@ class SettingsModel extends Model
             'rateLimitBurstSize' => Craft::t('search-with-elastic', 'Burst Size'),
             'rateLimitTrackingMethod' => Craft::t('search-with-elastic', 'Tracking Method'),
             'rateLimitExemptIps' => Craft::t('search-with-elastic', 'Exempt IP Addresses'),
+
+            // Dependent Re-indexing Configuration
+            'enableRelationalReindexing' => Craft::t('search-with-elastic', 'Enable Relational Re-indexing'),
+            'enableStructureReindexing' => Craft::t('search-with-elastic', 'Enable Structure Re-indexing'),
+            'dependentReindexBatchLimit' => Craft::t('search-with-elastic', 'Dependent Re-index Batch Limit'),
         ];
     }
 

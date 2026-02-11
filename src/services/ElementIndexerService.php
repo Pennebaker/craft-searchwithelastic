@@ -274,7 +274,7 @@ class ElementIndexerService extends Component
             return 'Element is a draft/revision or nested entry';
         }
 
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Check URL requirement
         if (!$settings->indexElementsWithoutUrls && !$element->getUrl()) {
@@ -342,7 +342,7 @@ class ElementIndexerService extends Component
      */
     protected function isElementTypeDisabled(Element $element): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         return match (get_class($element)) {
             Entry::class => in_array($element->type->handle, $settings->excludedEntryTypes, true),
@@ -368,7 +368,7 @@ class ElementIndexerService extends Component
             return false;
         }
 
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Check if element has no URL and that's not allowed
         if (!$settings->indexElementsWithoutUrls && !$element->getUrl()) {
@@ -440,7 +440,7 @@ class ElementIndexerService extends Component
         // Add extra fields from plugin settings
         $this->addExtraFields($element, $document);
 
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $fetchResult = ['attempted' => false, 'success' => false, 'debugInfo' => []];
 
         // Determine field names from settings
@@ -658,7 +658,7 @@ class ElementIndexerService extends Component
      */
     protected function addElementContent(Element $element, array &$document): array
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         if (!$settings->enableFrontendFetching) {
             return ['attempted' => false, 'success' => false];
@@ -763,7 +763,7 @@ class ElementIndexerService extends Component
      */
     protected function fetchElementContentWithDebug(string $url, Element $element): array
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         $debugInfo = [
             'url' => $url,
             'statusCode' => null,
@@ -800,7 +800,7 @@ class ElementIndexerService extends Component
      */
     protected function fetchElementContent(string $url, Element $element, ?array &$debugInfo = null): string
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Check for custom element content callback first
         if ($settings->elementContentCallback && is_callable($settings->elementContentCallback)) {
@@ -916,7 +916,7 @@ class ElementIndexerService extends Component
      */
     protected function extractTextFromHtml(string $html, Element $element = null): string
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Use custom content extractor callback if configured
         if ($settings->contentExtractorCallback && is_callable($settings->contentExtractorCallback)) {
@@ -999,7 +999,7 @@ class ElementIndexerService extends Component
      */
     protected function addExtraFields(Element $element, array &$document): void
     {
-        $extraFields = SearchWithElastic::getInstance()->getSettings()->extraFields;
+        $extraFields = SearchWithElastic::getPluginSettings()->extraFields;
         if (!empty($extraFields)) {
             foreach ($extraFields as $fieldName => $fieldParams) {
                 $fieldValue = ArrayHelper::getValue($fieldParams, 'value');
@@ -1042,7 +1042,7 @@ class ElementIndexerService extends Component
      */
     protected function shouldUseSearchableContent(Element $element): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Check if searchable fields are enabled globally
         if (!$settings->useSearchableFields) {
@@ -1080,7 +1080,7 @@ class ElementIndexerService extends Component
      */
     protected function shouldUseFrontendFetching(Element $element): bool
     {
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
 
         // Check if frontend fetching is enabled globally
         if (!$settings->enableFrontendFetching) {

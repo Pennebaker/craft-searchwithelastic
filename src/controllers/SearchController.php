@@ -44,7 +44,7 @@ class SearchController extends Controller
     {
         $behaviors = parent::behaviors();
         
-        $settings = SearchWithElastic::getInstance()->getSettings();
+        $settings = SearchWithElastic::getPluginSettings();
         
         // Add rate limiting behavior if enabled
         if ($settings->rateLimitingEnabled) {
@@ -176,7 +176,7 @@ class SearchController extends Controller
                 'timestamp' => time(),
             ];
             
-            $settings = SearchWithElastic::getInstance()->getSettings();
+            $settings = SearchWithElastic::getPluginSettings();
             if ($settings->rateLimitingEnabled) {
                 $rateLimiter = SearchWithElastic::getInstance()->rateLimiter;
                 $meta['rateLimit'] = [
