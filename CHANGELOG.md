@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-02-18
+### Fixed
+- Fixed variable initialization in utility.twig causing Twig Runtime Error Variable "totalCount" does not exist if no entries are present.
+
 ## [5.2.0] - 2026-02-11
 ### Added
 - Dependent re-indexing for related elements when a referenced element is saved.
@@ -30,7 +34,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Initial release of Search w/Elastic plugin for Craft CMS 5
 
-[Unreleased]: https://github.com/pennebaker/craft-searchwithelastic/compare/5.2.0...craft-5
+[Unreleased]: https://github.com/pennebaker/craft-searchwithelastic/compare/5.2.1...craft-5
+[5.2.1]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.2.1
 [5.2.0]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.2.0
 [5.1.2]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.1.2
 [5.1.1]: https://github.com/pennebaker/craft-searchwithelastic/releases/tag/5.1.1
