@@ -83,8 +83,8 @@
                             </td>
                             <th scope="row" class="site-name-cell">
                                 <strong>{{ siteData.name }}</strong>
+                                {% set totalCount = 0 %}
                                 {% if siteData.elementTypes|length > 0 %}
-                                    {% set totalCount = 0 %}
                                     {% for elementType in siteData.elementTypes %}
                                         {% set totalCount = totalCount + elementType.count %}
                                     {% endfor %}
